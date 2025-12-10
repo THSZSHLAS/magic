@@ -1,65 +1,57 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>Void Arcana: Elemental Interface</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>虚空奥术：Web版 (Void Arcana Web)</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; }
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Courier New', monospace; }
         #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-        #videoElement { display: none; } /* 隐藏原始视频，我们只看特效 */
+        #videoElement { position: absolute; top: 0; left: 0; transform: scaleX(-1); opacity: 0; pointer-events: none; } /* 隐藏原视频 */
         #ui-layer {
-            position: absolute; top: 20px; left: 20px; z-index: 2;
-            color: rgba(255, 255, 255, 0.7); font-family: 'Courier New', monospace;
+            position: absolute; top: 20px; left: 20px; z-index: 10;
+            color: rgba(255, 255, 255, 0.8); text-shadow: 0 0 5px #000;
             pointer-events: none;
         }
+        .loading { color: #0ff; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
+        /* 移动端适配 */
+        @media (max-width: 600px) { h1 { font-size: 1.2rem; } }
     </style>
 </head>
 <body>
 
 <div id="ui-layer">
-    <h1>VOID ARCANA SYSTEM</h1>
-    <p>Status: <span id="status">Connecting...</span></p>
-    <p>Instructions:</p>
-    <ul>
-        <li>Draw ▲ (Triangle) -> Fireball</li>
-        <li>Draw ■ (Square) -> Explosion</li>
-        <li>Draw ● (Circle) -> Ice Shards</li>
-        <li>Hold 👌 (OK Sign) -> Void Charge</li>
-    </ul>
+    <h1>VOID ARCANA <span style="font-size:0.5em">WEB EDITION</span></h1>
+    <div id="status" class="loading">正在初始化神经连接... (Loading AI Models)</div>
+    <div id="instructions" style="display:none; margin-top: 10px;">
+        <p>🖐️ <b>张开手掌</b>: 寒冰护盾 (Ice Shield)</p>
+        <p>👌 <b>捏合OK手势</b>: 虚空奇点 (Void Singularity)</p>
+        <p>☝️ <b>食指画圈/三角</b>: 烈焰轨迹 (Fire Trail)</p>
+    </div>
 </div>
 
-<video id="videoElement" autoplay playsinline></video>
+<video id="videoElement" playsinline></video>
 <div id="canvas-container"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module">
+    import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
+    import { FilesetResolver, HandLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0';
 
-<script>
-    // --- 1. 初始化 摄像头 & WebSocket ---
+    // --- 全局变量 ---
     const video = document.getElementById('videoElement');
-    const statusText = document.getElementById('status');
-    const ws = new WebSocket(`ws://${location.host}/ws`);
-    
-    // 离屏 Canvas 用于压缩图片发送给后端
-    const offCanvas = document.createElement('canvas');
-    const offCtx = offCanvas.getContext('2d');
+    const statusDiv = document.getElementById('status');
+    const instrDiv = document.getElementById('instructions');
+    let handLandmarker = undefined;
+    let lastVideoTime = -1;
+    let results = undefined;
 
-    navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false })
-        .then(stream => {
-            video.srcObject = stream;
-            video.play();
-            statusText.innerText = "Camera Active. Syncing...";
-        })
-        .catch(err => console.error("Camera Error:", err));
-
-    ws.onopen = () => { statusText.innerText = "System Online. Awaiting Input."; };
-    
-    // --- 2. Three.js 场景设置 (魔法世界) ---
+    // --- 1. Three.js 场景初始化 (The World) ---
     const scene = new THREE.Scene();
-    // 添加一点环境雾气
-    scene.fog = new THREE.FogExp2(0x000000, 0.002);
+    scene.fog = new THREE.FogExp2(0x000000, 0.002); // 虚空迷雾
 
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 500;
+    camera.position.z = 20;
 
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -68,142 +60,191 @@
     // 灯光
     const ambientLight = new THREE.AmbientLight(0x404040);
     scene.add(ambientLight);
+    const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+    pointLight.position.set(0, 10, 10);
+    scene.add(pointLight);
 
-    // 存储所有的魔法物体
-    const spells = [];
-    const particles = [];
+    // --- 2. 魔法特效系统 (Magic System) ---
+    const spells = []; // 存储发射出去的魔法
+    const particles = []; // 存储粒子
+    const trailPoints = []; // 存储食指轨迹
+    let trailMesh = null;
 
-    // --- 3. 魔法工厂 (Visual Effects) ---
+    // 材质缓存
+    const fireMaterial = new THREE.MeshBasicMaterial({ color: 0xff4500 });
+    const iceMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x00ffff, emissive: 0x001133, roughness: 0.1, metalness: 0.8, transparent: true, opacity: 0.7 
+    });
+    const voidMaterial = new THREE.PointsMaterial({ color: 0x8a2be2, size: 0.5, sizeAttenuation: true });
 
-    // 创建火球
-    function createFireball(x, y, isBig) {
-        const geometry = new THREE.SphereGeometry(isBig ? 30 : 15, 32, 32);
-        const material = new THREE.MeshBasicMaterial({ color: 0xff4500 });
-        const sphere = new THREE.Mesh(geometry, material);
-        
-        // 转换 2D 坐标到 3D 空间 (简化版映射)
-        sphere.position.x = (x / 640) * window.innerWidth - window.innerWidth / 2;
-        sphere.position.y = -((y / 480) * window.innerHeight - window.innerHeight / 2);
-        sphere.position.z = 0;
-        
-        scene.add(sphere);
-        spells.push({ mesh: sphere, type: 'fire', velocity: new THREE.Vector3(0, 0, -10) });
+    // 辅助函数：屏幕坐标转3D世界坐标
+    function screenToWorld(x, y, z = 10) {
+        const vec = new THREE.Vector3();
+        vec.set((x * 2) - 1, -(y * 2) + 1, 0.5);
+        vec.unproject(camera);
+        vec.sub(camera.position).normalize();
+        const distance = -camera.position.z / vec.z + z; // z is depth offset
+        return camera.position.clone().add(vec.multiplyScalar(distance));
     }
 
-    // 创建冰锥
-    function createIceShard(x, y) {
-        const geometry = new THREE.ConeGeometry(5, 30, 8);
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ffff });
-        const cone = new THREE.Mesh(geometry, material);
-        
-        cone.position.x = (x / 640) * window.innerWidth - window.innerWidth / 2;
-        cone.position.y = -((y / 480) * window.innerHeight - window.innerHeight / 2);
-        cone.rotation.x = -Math.PI / 2; // 指向屏幕内
-        
-        scene.add(cone);
-        spells.push({ mesh: cone, type: 'ice', velocity: new THREE.Vector3(0, 0, -15) });
+    // 特效：火焰轨迹
+    function updateTrail(x, y) {
+        const pos = screenToWorld(x, y, 0); // 靠近屏幕
+        trailPoints.push(pos);
+        if (trailPoints.length > 20) trailPoints.shift(); // 限制长度
+
+        if (trailMesh) scene.remove(trailMesh);
+        if (trailPoints.length > 1) {
+            const geometry = new THREE.BufferGeometry().setFromPoints(trailPoints);
+            // 简单的线段，进阶可以用 TubeGeometry
+            const material = new THREE.LineBasicMaterial({ color: 0xffaa00, linewidth: 2 });
+            trailMesh = new THREE.Line(geometry, material);
+            scene.add(trailMesh);
+        }
     }
 
-    // 虚空充能特效 (粒子)
-    function createVoidParticles(x, y) {
-        // 简单模拟：在指尖位置生成随机紫色粒子
+    // 特效：虚空充能 (OK手势)
+    function spawnVoidParticles(x, y) {
+        const center = screenToWorld(x, y, 0);
         const geometry = new THREE.BufferGeometry();
         const vertices = [];
-        vertices.push(0,0,0);
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        
-        const material = new THREE.PointsMaterial({ color: 0x8a2be2, size: 10 });
-        const point = new THREE.Points(geometry, material);
-        
-        point.position.x = (x / 640) * window.innerWidth - window.innerWidth / 2;
-        point.position.y = -((y / 480) * window.innerHeight - window.innerHeight / 2);
-        point.position.z = 50;
-
-        scene.add(point);
-        particles.push({ mesh: point, life: 20 }); // 寿命 20 帧
-    }
-    
-    // 绘制轨迹 (Drawing Trail)
-    let trailPoints = [];
-    const trailMaterial = new THREE.LineBasicMaterial({ color: 0xffd700 }); // 金色轨迹
-    let trailLine = null;
-
-    function updateTrail(x, y) {
-        const vec = new THREE.Vector3(
-            (x / 640) * window.innerWidth - window.innerWidth / 2,
-            -((y / 480) * window.innerHeight - window.innerHeight / 2),
-            100
-        );
-        trailPoints.push(vec);
-        if(trailPoints.length > 50) trailPoints.shift(); // 限制轨迹长度
-
-        if(trailLine) scene.remove(trailLine);
-        const geometry = new THREE.BufferGeometry().setFromPoints(trailPoints);
-        trailLine = new THREE.Line(geometry, trailMaterial);
-        scene.add(trailLine);
-    }
-
-    // --- 4. 主循环 ---
-    
-    // 处理后端返回的消息
-    ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        
-        if (data.type === "drawing") {
-            updateTrail(data.x, data.y);
-        } else if (data.type === "void_charge") {
-            createVoidParticles(data.x, data.y);
-            trailPoints = []; // 清空轨迹
-            if(trailLine) scene.remove(trailLine);
-        } else if (data.type === "cast_spell") {
-            // 施法！
-            trailPoints = []; // 清空轨迹
-            if(trailLine) scene.remove(trailLine);
-            
-            if (data.spell === "triangle") createFireball(data.x, data.y, false);
-            if (data.spell === "square") createFireball(data.x, data.y, true);
-            if (data.spell === "circle") createIceShard(data.x, data.y);
+        for(let i=0; i<5; i++) {
+            // 随机抖动
+            vertices.push(center.x + (Math.random()-0.5), center.y + (Math.random()-0.5), center.z);
         }
-    };
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        const pts = new THREE.Points(geometry, voidMaterial);
+        scene.add(pts);
+        particles.push({ mesh: pts, life: 30, type: 'void' });
+    }
 
-    // 动画循环
-    function animate() {
-        requestAnimationFrame(animate);
+    // 特效：发射冰锥 (张开手掌)
+    let cooldown = 0;
+    function castIceShard(x, y) {
+        if (cooldown > 0) return;
+        cooldown = 20; // 冷却时间
 
-        // 1. 发送视频帧给 Python (限制频率以防卡顿，这里每隔 3 帧发一次)
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            offCanvas.width = 640; // 压缩分辨率
-            offCanvas.height = 480;
-            offCtx.drawImage(video, 0, 0, 640, 480);
-            // 只有当 WS 连接打开时才发送
-            if(ws.readyState === WebSocket.OPEN) {
-               // 实际项目中这里需要节流 (Throttle)
-               const imageData = offCanvas.toDataURL('image/jpeg', 0.5);
-               ws.send(imageData); 
+        const geometry = new THREE.ConeGeometry(0.5, 3, 4);
+        const mesh = new THREE.Mesh(geometry, iceMaterial);
+        const startPos = screenToWorld(x, y, -5);
+        mesh.position.copy(startPos);
+        
+        // 指向屏幕深处
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.rotation.z = Math.random() * Math.PI;
+
+        scene.add(mesh);
+        spells.push({ mesh: mesh, vel: new THREE.Vector3(0, 0, -0.8), type: 'ice' });
+    }
+
+    // --- 3. MediaPipe 初始化 (AI Brain) ---
+    async function setupAI() {
+        const vision = await FilesetResolver.forVisionTasks(
+            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
+        );
+        handLandmarker = await HandLandmarker.createFromOptions(vision, {
+            baseOptions: {
+                modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+                delegate: "GPU"
+            },
+            runningMode: "VIDEO",
+            numHands: 2
+        });
+        statusDiv.innerText = "System Ready. Waiting for Camera...";
+        startCamera();
+    }
+
+    // --- 4. 摄像头控制 ---
+    function startCamera() {
+        navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } })
+            .then((stream) => {
+                video.srcObject = stream;
+                video.addEventListener("loadeddata", predictWebcam);
+                statusDiv.innerText = "Active";
+                statusDiv.classList.remove('loading');
+                statusDiv.style.color = "#0f0";
+                instrDiv.style.display = "block";
+            });
+    }
+
+    // --- 5. 核心逻辑循环 (Loop) ---
+    async function predictWebcam() {
+        // 1. AI 识别
+        let startTimeMs = performance.now();
+        if (lastVideoTime !== video.currentTime) {
+            lastVideoTime = video.currentTime;
+            results = handLandmarker.detectForVideo(video, startTimeMs);
+        }
+
+        // 2. 逻辑判定
+        if (results && results.landmarks) {
+            // 没有手的时候清空轨迹
+            if (results.landmarks.length === 0) {
+                trailPoints.length = 0;
+                if(trailMesh) { scene.remove(trailMesh); trailMesh = null; }
+            }
+
+            for (const landmarks of results.landmarks) {
+                // MediaPipe 坐标是 0.0 - 1.0
+                // 8: 食指指尖, 4: 拇指指尖, 0: 手腕, 12: 中指指尖
+                const idx = landmarks[8];
+                const thumb = landmarks[4];
+                const mid = landmarks[12];
+                
+                // 计算距离 (简单的手势判断)
+                const pinchDist = Math.hypot(idx.x - thumb.x, idx.y - thumb.y);
+                const openHandDist = Math.hypot(idx.x - 0, idx.y - 0); // 并不是很准，但足够简单
+
+                // 手势 A: OK 手势 (Pinch) -> 虚空
+                if (pinchDist < 0.05) {
+                    spawnVoidParticles(idx.x, idx.y); // 注意：MediaPipe x 是镜像的
+                } 
+                // 手势 B: 张开手掌 (简单的判断：食指和拇指很远) -> 冰锥
+                else if (pinchDist > 0.15) {
+                    castIceShard(mid.x, mid.y); // 用中指发射
+                    updateTrail(idx.x, idx.y); // 同时保留一点轨迹
+                }
+                // 默认：绘制轨迹
+                else {
+                    updateTrail(idx.x, idx.y);
+                }
             }
         }
 
-        // 2. 更新魔法物体位置
+        // 3. 渲染画面
+        renderLoop();
+        
+        window.requestAnimationFrame(predictWebcam);
+    }
+
+    function renderLoop() {
+        if(cooldown > 0) cooldown--;
+
+        // 更新魔法物体
         for (let i = spells.length - 1; i >= 0; i--) {
             const s = spells[i];
-            s.mesh.position.add(s.velocity);
-            
-            // 简单的旋转效果
+            s.mesh.position.add(s.vel);
             s.mesh.rotation.z += 0.1;
-            if(s.type === 'fire') s.mesh.rotation.x += 0.1;
-
-            // 飞太远就销毁
-            if (s.mesh.position.z < -1000) {
+            
+            if (s.mesh.position.z < -50) { // 飞远了消失
                 scene.remove(s.mesh);
                 spells.splice(i, 1);
             }
         }
 
-        // 3. 更新粒子
+        // 更新粒子
         for (let i = particles.length - 1; i >= 0; i--) {
             const p = particles[i];
             p.life--;
-            p.mesh.material.opacity = p.life / 20;
+            p.mesh.material.opacity = p.life / 30;
+            // 简单的扩散动画
+            const positions = p.mesh.geometry.attributes.position.array;
+            for(let j=0; j<positions.length; j+=3) {
+                positions[j] += (Math.random()-0.5) * 0.1;
+                positions[j+1] += (Math.random()-0.5) * 0.1;
+            }
+            p.mesh.geometry.attributes.position.needsUpdate = true;
+
             if (p.life <= 0) {
                 scene.remove(p.mesh);
                 particles.splice(i, 1);
@@ -212,15 +253,16 @@
 
         renderer.render(scene, camera);
     }
-    animate();
 
-    // 窗口大小自适应
+    // 启动
+    setupAI();
+
+    // 窗口自适应
     window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
-
 </script>
 </body>
 </html>
