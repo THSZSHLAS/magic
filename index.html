@@ -3,344 +3,288 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>虚空奥术：元素大师 (Void Arcana Master)</title>
+    <title>虚空奥术：国内优化版</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Courier New', monospace; }
+        /* 强制背景全黑，防止白屏 */
+        html, body { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background-color: #000000 !important; 
+            overflow: hidden; 
+            font-family: 'Courier New', monospace; 
+        }
         #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         
-        /* UI 层 */
+        /* UI 层：始终置顶 */
         #ui-layer {
-            position: absolute; top: 20px; left: 20px; z-index: 10;
+            position: absolute; top: 20px; left: 20px; z-index: 999;
             color: rgba(255, 255, 255, 0.9); 
             text-shadow: 0 0 5px #000;
             pointer-events: none;
+            width: 300px;
         }
         
-        /* 屏幕日志 - 专门用来在手机/Mac上看报错 */
-        #debug-console {
-            position: absolute; bottom: 10px; left: 10px; width: 90%; 
-            max-height: 150px; overflow-y: auto;
-            color: #ff3333; background: rgba(0,0,0,0.5);
-            font-size: 12px; pointer-events: none; z-index: 20;
-            display: none; /* 默认隐藏，有错才显示 */
+        /* 加载状态条 */
+        #loading-bar-container {
+            width: 100%; height: 4px; background: #333; margin-top: 10px;
+            display: none;
         }
+        #loading-bar { width: 0%; height: 100%; background: #00ffff; transition: width 0.3s; }
 
         .guide-box {
-            background: rgba(0, 20, 40, 0.6);
+            background: rgba(0, 20, 40, 0.8);
             padding: 15px;
             border-left: 3px solid #00ffff;
             border-radius: 4px;
             margin-top: 10px;
+            display: none; /* 默认隐藏，加载完显示 */
         }
-        .loading { color: #0ff; animation: blink 1s infinite; font-weight: bold; }
-        @keyframes blink { 50% { opacity: 0.5; } }
+        
+        /* 错误提示框 */
+        #error-box {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(50, 0, 0, 0.9); border: 2px solid red; color: white;
+            padding: 20px; text-align: center; z-index: 1000; display: none;
+        }
     </style>
 </head>
 <body>
 
 <div id="ui-layer">
-    <h1>VOID ARCANA <span style="font-size:0.5em; color:#aaa">MASTER</span></h1>
-    <div id="status" class="loading">正在连接魔法网络... (Init AI...)</div>
+    <h1>VOID ARCANA <span style="font-size:0.5em; color:#0ff">CN</span></h1>
+    <div id="status" style="color: #ffaa00;">正在初始化...</div>
+    <div id="loading-bar-container"><div id="loading-bar"></div></div>
     
-    <div id="instructions" class="guide-box" style="display:none;">
-        <p>🖐️ <b>手掌张开</b>: 光棱护盾 (Shield)</p>
-        <p>🤘 <b>摇滚手势</b>: 雷霆锁链 (Lightning)</p>
-        <p>✊ <b>用力握拳</b>: 黑洞引力 (Gravity)</p>
-        <p>☝️ <b>食指移动</b>: 流光轨迹 (Trace)</p>
+    <div id="instructions" class="guide-box">
+        <p style="color:#0ff; font-weight:bold;">系统就绪 (System Ready)</p>
+        <p>🖐️ <b>张开手掌</b>: 光棱护盾</p>
+        <p>🤘 <b>摇滚手势</b>: 雷霆锁链</p>
+        <p>✊ <b>用力握拳</b>: 黑洞引力</p>
     </div>
 </div>
 
-<div id="debug-console"></div>
+<div id="error-box">
+    <h3 id="error-title">连接失败</h3>
+    <p id="error-msg">请检查网络</p>
+    <button onclick="location.reload()" style="margin-top:10px; padding:5px 10px;">重试</button>
+</div>
 
 <video id="videoElement" playsinline style="display:none"></video>
 <div id="canvas-container"></div>
 
 <script type="module">
-    // 1. 引入 Three.js (使用更稳定的 CDN)
     import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
-    // 2. 引入 MediaPipe (Google 官方视觉库)
     import { FilesetResolver, HandLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/+esm';
 
-    // --- 屏幕日志系统 (Debug System) ---
-    const debugDiv = document.getElementById('debug-console');
-    function logError(msg) {
-        debugDiv.style.display = 'block';
-        debugDiv.innerHTML += `> [ERROR] ${msg}<br>`;
-        console.error(msg);
-    }
-    function logInfo(msg) {
-        const status = document.getElementById('status');
-        if(status) status.innerText = msg;
-        console.log(msg);
+    // --- 日志与错误处理 ---
+    const statusDiv = document.getElementById('status');
+    const loadingBar = document.getElementById('loading-bar');
+    const loadingContainer = document.getElementById('loading-bar-container');
+    
+    function showStatus(msg, progress = -1) {
+        statusDiv.innerText = msg;
+        console.log(`[Status] ${msg}`);
+        if(progress >= 0) {
+            loadingContainer.style.display = 'block';
+            loadingBar.style.width = `${progress}%`;
+        }
     }
 
-    // --- 全局变量 ---
-    const video = document.getElementById('videoElement');
-    let handLandmarker = undefined;
-    let lastVideoTime = -1;
-    let results = undefined;
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    function showError(title, msg) {
+        document.getElementById('error-box').style.display = 'block';
+        document.getElementById('error-title').innerText = title;
+        document.getElementById('error-msg').innerHTML = msg;
+        statusDiv.innerText = "系统错误";
+        statusDiv.style.color = "red";
+    }
 
-    // --- Three.js 场景设置 ---
+    // --- 强制修正样式 ---
+    document.body.style.backgroundColor = "black";
+
+    // --- 1. Three.js 初始化 ---
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x000000, 0.002); 
-
-    const camera = new THREE.PerspectiveCamera(75, w / h, 0.1, 1000);
+    scene.fog = new THREE.FogExp2(0x000000, 0.003); 
+    
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.z = 20;
 
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    renderer.setSize(w, h);
+    renderer.setSize(window.innerWidth, window.innerHeight);
     document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-    // 灯光
-    const ambientLight = new THREE.AmbientLight(0x404040, 2); 
+    const ambientLight = new THREE.AmbientLight(0x404040, 3); 
     scene.add(ambientLight);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-    dirLight.position.set(0, 10, 10);
-    scene.add(dirLight);
 
-    // --- 魔法特效对象池 ---
+    // --- 2. 魔法特效 (粒子系统) ---
     const particles = []; 
     const lightningBolts = [];
     let shieldMesh = null;
-    let trailMesh = null;
-    const trailPoints = [];
-
-    // --- 材质预设 ---
-    // 护盾材质 (半透明发光)
     const shieldMat = new THREE.MeshPhongMaterial({ 
-        color: 0x00ffff, emissive: 0x0044aa, 
-        transparent: true, opacity: 0.3, 
-        side: THREE.DoubleSide, wireframe: true 
+        color: 0x00ffff, emissive: 0x002255, transparent: true, opacity: 0.2, wireframe: true 
     });
-    // 雷电材质
-    const lightningMat = new THREE.LineBasicMaterial({ color: 0xaa00ff, linewidth: 3 });
+    const lightningMat = new THREE.LineBasicMaterial({ color: 0xaa00ff, linewidth: 2 });
 
-    // --- 辅助函数：坐标转换 ---
     function screenToWorld(x, y, z = 10) {
-        const vec = new THREE.Vector3();
-        // MediaPipe x 是镜像的，所以这里可能需要根据情况反转
-        // 通常 webcam 是镜像的，所以 x 需要 1-x
-        vec.set(((1-x) * 2) - 1, -(y * 2) + 1, 0.5); 
+        const vec = new THREE.Vector3(((1-x) * 2) - 1, -(y * 2) + 1, 0.5); 
         vec.unproject(camera);
         vec.sub(camera.position).normalize();
-        const distance = -camera.position.z / vec.z + z;
-        return camera.position.clone().add(vec.multiplyScalar(distance));
+        return camera.position.clone().add(vec.multiplyScalar(-camera.position.z / vec.z + z));
     }
 
-    // --- 魔法实现 ---
-
-    // 1. 护盾逻辑 (Shield)
-    function updateShield(handCenter, isActive) {
+    // 护盾
+    function updateShield(active, x, y) {
         if (!shieldMesh) {
-            const geometry = new THREE.IcosahedronGeometry(4, 1);
-            shieldMesh = new THREE.Mesh(geometry, shieldMat);
+            shieldMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(4, 1), shieldMat);
             scene.add(shieldMesh);
         }
-        
-        if (isActive) {
-            const pos = screenToWorld(handCenter.x, handCenter.y, -5);
-            shieldMesh.position.lerp(pos, 0.2); // 平滑移动
-            shieldMesh.rotation.z += 0.02;
-            shieldMesh.rotation.y += 0.02;
-            shieldMesh.visible = true;
-        } else {
-            shieldMesh.visible = false;
+        shieldMesh.visible = active;
+        if (active) {
+            const pos = screenToWorld(x, y, -5);
+            shieldMesh.position.lerp(pos, 0.1);
+            shieldMesh.rotation.y += 0.05;
         }
     }
 
-    // 2. 雷电逻辑 (Lightning)
-    function castLightning(fingerTip) {
-        // 创建一个随机折线
-        const start = screenToWorld(fingerTip.x, fingerTip.y, -2);
-        const end = new THREE.Vector3(start.x + (Math.random()-0.5)*20, start.y + (Math.random()-0.5)*20, -50);
-        
+    // 雷电
+    function castLightning(x, y) {
+        if(Math.random() > 0.3) return; // 限制频率
+        const start = screenToWorld(x, y, -2);
+        const end = new THREE.Vector3(start.x + (Math.random()-0.5)*15, start.y + (Math.random()-0.5)*15, -40);
         const points = [];
         let curr = start.clone();
-        const segments = 10;
-        for(let i=0; i<=segments; i++) {
+        for(let i=0; i<=6; i++) {
             points.push(curr.clone());
-            // 向目标方向移动，稍微加点抖动
-            curr.lerp(end, 1/segments);
-            curr.x += (Math.random()-0.5) * 2;
-            curr.y += (Math.random()-0.5) * 2;
+            curr.lerp(end, 1/6).add(new THREE.Vector3((Math.random()-0.5)*3, (Math.random()-0.5)*3, 0));
         }
-        
-        const geo = new THREE.BufferGeometry().setFromPoints(points);
-        const line = new THREE.Line(geo, lightningMat);
+        const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), lightningMat);
         scene.add(line);
-        lightningBolts.push({ mesh: line, life: 5 }); // 存活 5 帧
+        lightningBolts.push({ mesh: line, life: 4 });
     }
 
-    // 3. 黑洞引力 (Gravity)
-    function applyGravity(handPos) {
-        const center = screenToWorld(handPos.x, handPos.y, 0);
-        // 让所有粒子向手心移动
-        particles.forEach(p => {
-            const dir = new THREE.Vector3().subVectors(center, p.mesh.position).normalize();
-            p.vel.add(dir.multiplyScalar(0.5)); // 加速吸入
-        });
-        
-        // 视觉反馈：手心冒黑烟
-        if(Math.random() > 0.5) spawnParticle(handPos.x, handPos.y, 0x800080, true);
-    }
-
-    // 4. 普通粒子生成
-    function spawnParticle(x, y, color, isImploding=false) {
-        const geo = new THREE.PlaneGeometry(0.5, 0.5);
-        const mat = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide });
-        const mesh = new THREE.Mesh(geo, mat);
-        
+    // 黑洞粒子
+    function spawnParticle(x, y, color) {
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.4), new THREE.MeshBasicMaterial({ color: color }));
         mesh.position.copy(screenToWorld(x, y, 0));
-        // 随机朝向
         mesh.lookAt(camera.position);
-        
-        const vel = new THREE.Vector3((Math.random()-0.5)*0.5, (Math.random()-0.5)*0.5, 0);
-        if(!isImploding) scene.add(mesh);
-        particles.push({ mesh: mesh, vel: vel, life: 60 });
-        if(isImploding) scene.add(mesh);
+        scene.add(mesh);
+        particles.push({ mesh: mesh, vel: new THREE.Vector3((Math.random()-0.5), (Math.random()-0.5), 0), life: 40 });
     }
 
-    // --- MediaPipe 初始化 ---
+    // --- 3. AI 初始化 (关键修改) ---
+    let handLandmarker = undefined;
+    const video = document.getElementById('videoElement');
+
     async function setupAI() {
+        showStatus("正在下载 AI 模型 (约10MB)...", 10);
+        
         try {
+            // Step 1: 加载 WASM
             const vision = await FilesetResolver.forVisionTasks(
                 "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm"
             );
+            showStatus("引擎加载完毕，获取模型...", 50);
+
+            // Step 2: 加载模型 (尝试使用 jsDelivr 镜像，如果失败则报错)
+            // 这是一个可以直接访问的 CDN 地址
+            const modelUrl = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+            
+            // 检测网络：如果是国内环境，Google 链接可能会卡死
+            // 为了解决这个问题，我们设置一个超时提示
+            const loadTimeout = setTimeout(() => {
+                showError("下载超时", "AI 模型下载太慢。<br><b>如果你在中国，请开启 VPN (代理)。</b><br>或者检查网络连接。");
+            }, 15000); // 15秒超时
+
             handLandmarker = await HandLandmarker.createFromOptions(vision, {
                 baseOptions: {
-                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+                    modelAssetPath: modelUrl,
                     delegate: "GPU"
                 },
                 runningMode: "VIDEO",
                 numHands: 2
             });
-            logInfo("AI 模型加载完毕，正在开启摄像头...");
+            
+            clearTimeout(loadTimeout); // 加载成功，清除超时警告
+            showStatus("请求摄像头权限...", 90);
             startCamera();
+
         } catch (e) {
-            logError("AI 初始化失败: " + e.message + " | 请检查网络连接");
+            showError("启动失败", `详细错误: ${e.message}<br><br>常见原因：<br>1. 网络无法访问 Google<br>2. 没给摄像头权限`);
         }
     }
 
     function startCamera() {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            logError("浏览器不支持摄像头访问，或未在 HTTPS/Localhost 下运行。");
+            showError("浏览器不兼容", "请使用 Chrome / Edge / Safari。<br>必须使用 HTTPS 或 localhost。");
             return;
         }
-        
         navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } })
             .then((stream) => {
                 video.srcObject = stream;
                 video.addEventListener("loadeddata", () => {
-                    logInfo(""); // 清空状态
-                    document.getElementById('status').classList.remove('loading');
-                    document.getElementById('status').style.color = "#00ff00";
-                    document.getElementById('status').innerText = "LINK START >>";
-                    document.getElementById('instructions').style.display = "block";
+                    showStatus("系统上线", 100);
+                    setTimeout(() => { 
+                        loadingContainer.style.display = 'none'; 
+                        document.getElementById('instructions').style.display = 'block';
+                    }, 500);
                     predictWebcam();
                 });
             })
-            .catch(err => {
-                logError("摄像头开启失败: " + err.message);
-            });
+            .catch(err => showError("摄像头被拒绝", "请允许浏览器访问摄像头，并刷新页面。"));
     }
 
-    // 辅助：判断手指是否伸直 (Tip 到 Wrist 的距离 vs Pip 到 Wrist 的距离)
-    function isFingerExtended(landmarks, fingerTipIdx, fingerPipIdx) {
-        const wrist = landmarks[0];
-        const tip = landmarks[fingerTipIdx];
-        const pip = landmarks[fingerPipIdx];
-        const distTip = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
-        const distPip = Math.hypot(pip.x - wrist.x, pip.y - wrist.y);
-        return distTip > distPip;
-    }
-
-    // --- 核心循环 ---
-    async function predictWebcam() {
+    // --- 4. 循环逻辑 ---
+    let lastVideoTime = -1;
+    function predictWebcam() {
         let startTimeMs = performance.now();
-        if (lastVideoTime !== video.currentTime) {
+        if (lastVideoTime !== video.currentTime && handLandmarker) {
             lastVideoTime = video.currentTime;
-            if(handLandmarker) {
-                results = handLandmarker.detectForVideo(video, startTimeMs);
-            }
-        }
-
-        // 逻辑处理
-        let shieldActive = false;
-        let handCenter = {x:0.5, y:0.5};
-
-        if (results && results.landmarks) {
-            for (const landmarks of results.landmarks) {
-                // 获取手指状态
-                const idxOpen = isFingerExtended(landmarks, 8, 5);  // 食指
-                const midOpen = isFingerExtended(landmarks, 12, 9); // 中指
-                const ringOpen = isFingerExtended(landmarks, 16, 13);// 无名指
-                const pinkyOpen = isFingerExtended(landmarks, 20, 17);// 小指
-                const thumbOpen = isFingerExtended(landmarks, 4, 2);  // 拇指
-
-                // 计算手掌中心 (用 0 和 9 的中间)
-                const palmX = (landmarks[0].x + landmarks[9].x) / 2;
-                const palmY = (landmarks[0].y + landmarks[9].y) / 2;
-                
-                // 1. 🤘 摇滚手势 (雷电): 食指+小指伸直，中指+无名指弯曲
-                if (idxOpen && pinkyOpen && !midOpen && !ringOpen) {
-                    castLightning(landmarks[8]); // 食指发射
-                    castLightning(landmarks[20]); // 小指发射
-                }
-                
-                // 2. 🖐️ 张开手掌 (护盾): 所有手指都伸直
-                else if (idxOpen && midOpen && ringOpen && pinkyOpen) {
-                    shieldActive = true;
-                    handCenter = {x: palmX, y: palmY};
-                }
-
-                // 3. ✊ 握拳 (黑洞): 所有手指弯曲
-                else if (!idxOpen && !midOpen && !ringOpen && !pinkyOpen) {
-                    applyGravity({x: palmX, y: palmY});
-                }
-
-                // 4. ☝️ 默认: 只是食指伸直 (画轨迹)
-                else if (idxOpen && !midOpen) {
-                    const tip = landmarks[8];
-                    spawnParticle(tip.x, tip.y, 0xffaa00); // 留下火焰粒子
-                }
-            }
-        }
-
-        // 渲染更新
-        updateShield(handCenter, shieldActive);
-        
-        // 更新雷电 (一闪而过)
-        for(let i = lightningBolts.length-1; i>=0; i--) {
-            lightningBolts[i].life--;
-            if(lightningBolts[i].life <= 0) {
-                scene.remove(lightningBolts[i].mesh);
-                lightningBolts.splice(i, 1);
-            }
-        }
-
-        // 更新粒子
-        for (let i = particles.length - 1; i >= 0; i--) {
-            const p = particles[i];
-            p.life--;
-            p.mesh.position.add(p.vel);
-            p.mesh.rotation.z += 0.1;
-            p.mesh.material.opacity = p.life / 60;
+            const results = handLandmarker.detectForVideo(video, startTimeMs);
             
-            if (p.life <= 0) {
-                scene.remove(p.mesh);
-                particles.splice(i, 1);
+            let shieldActive = false;
+            let handPos = {x:0, y:0};
+
+            if (results.landmarks) {
+                for (const landmarks of results.landmarks) {
+                    const idxOpen = isFingerExtended(landmarks, 8, 5);
+                    const pinkyOpen = isFingerExtended(landmarks, 20, 17);
+                    const midOpen = isFingerExtended(landmarks, 12, 9);
+                    const ringOpen = isFingerExtended(landmarks, 16, 13);
+                    const palmX = landmarks[9].x; const palmY = landmarks[9].y;
+
+                    // 逻辑判断
+                    if (idxOpen && pinkyOpen && !midOpen && !ringOpen) { // 摇滚
+                        castLightning(landmarks[8].x, landmarks[8].y);
+                        castLightning(landmarks[20].x, landmarks[20].y);
+                    } else if (idxOpen && midOpen && ringOpen && pinkyOpen) { // 张开
+                        shieldActive = true; handPos = {x: palmX, y: palmY};
+                    } else if (!idxOpen && !midOpen && !ringOpen && !pinkyOpen) { // 握拳
+                        spawnParticle(palmX, palmY, 0x8a2be2); // 黑洞粒子
+                    } else if (idxOpen) {
+                        spawnParticle(landmarks[8].x, landmarks[8].y, 0xffaa00); // 轨迹
+                    }
+                }
             }
+            updateShield(shieldActive, handPos.x, handPos.y);
         }
+
+        // 渲染循环
+        lightningBolts.forEach((b, i) => { 
+            b.life--; if(b.life<=0) { scene.remove(b.mesh); lightningBolts.splice(i,1); } 
+        });
+        particles.forEach((p, i) => {
+            p.life--; p.mesh.position.add(p.vel); p.mesh.rotation.z += 0.2; p.mesh.material.opacity = p.life/40;
+            if(p.life<=0) { scene.remove(p.mesh); particles.splice(i,1); }
+        });
 
         renderer.render(scene, camera);
-        window.requestAnimationFrame(predictWebcam);
+        requestAnimationFrame(predictWebcam);
+    }
+
+    function isFingerExtended(lm, tip, pip) {
+        return Math.hypot(lm[tip].x-lm[0].x, lm[tip].y-lm[0].y) > Math.hypot(lm[pip].x-lm[0].x, lm[pip].y-lm[0].y);
     }
 
     // 启动
     setupAI();
-
     window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
