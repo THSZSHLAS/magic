@@ -2,269 +2,457 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Void Arcana: US/Mac Ultimate</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Magic Master V10: Barrage</title>
     <style>
-        /* 1. 基础设置：黑色背景 */
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Courier New', monospace; }
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', sans-serif; }
         
-        /* 2. 视频层：Mac Safari 必须可见但透明，不能 display:none */
-        #videoElement {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            object-fit: cover; opacity: 0; z-index: -1; pointer-events: none;
+        /* 视频层：镜像翻转，透明 */
+        #videoElement { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            object-fit: cover; opacity: 0; z-index: -1; pointer-events: none; transform: scaleX(-1); 
         }
-        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-
-        /* 3. UI 层 */
-        #ui-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center;
-            pointer-events: none; /* 让点击穿透 */
+        
+        /* UI 层 */
+        #ui-layer { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            pointer-events: none; 
         }
-
-        /* 4. 启动按钮 (关键！) */
+        
+        /* 启动按钮 */
         #start-btn {
-            pointer-events: auto; /* 只有按钮能点 */
-            padding: 20px 50px; font-size: 24px; font-weight: bold;
-            color: #00ffff; background: rgba(0, 0, 0, 0.8);
-            border: 2px solid #00ffff; border-radius: 10px;
-            cursor: pointer; box-shadow: 0 0 20px #00ffff;
-            transition: 0.3s;
+            pointer-events: auto; padding: 20px 60px; font-size: 30px; font-weight: 900; letter-spacing: 4px;
+            color: #fff; background: rgba(0,0,0,0.6); 
+            border: 3px solid #00ffff; border-radius: 4px; cursor: pointer;
+            box-shadow: 0 0 20px #00ffff, inset 0 0 20px #00ffff;
+            text-shadow: 0 0 10px #fff; transition: 0.2s;
         }
-        #start-btn:hover { background: #00ffff; color: #000; }
+        #start-btn:hover { background: #00ffff; color: #000; box-shadow: 0 0 50px #00ffff; }
 
-        /* 5. 调试 HUD (左上角) */
-        #debug-hud {
-            position: absolute; top: 10px; left: 10px; z-index: 1000;
-            color: lime; font-size: 14px; background: rgba(0,0,0,0.5); padding: 5px;
-            display: none; pointer-events: none;
+        /* HUD 状态栏 */
+        #hud { 
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); 
+            z-index: 100; text-align: center; pointer-events: none; display: none;
+            background: linear-gradient(90deg, transparent, rgba(0,0,0,0.8), transparent);
+            padding: 10px 50px; width: 80%;
         }
+        #spell-name {
+            font-size: 36px; font-weight: bold; letter-spacing: 5px; text-transform: uppercase;
+            text-shadow: 0 0 20px currentColor; transition: color 0.2s;
+        }
+        #combo-counter { font-size: 14px; color: #888; margin-top: 5px; }
+
+        /* 准星 */
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; width: 60px; height: 60px;
+            transform: translate(-50%, -50%); 
+            border: 2px solid rgba(255, 255, 255, 0.4); border-radius: 50%; 
+            pointer-events: none; z-index: 50; transition: transform 0.1s;
+        }
+        #crosshair.shooting { transform: translate(-50%, -50%) scale(0.8); border-color: #00ffff; }
         
-        /* 游戏内说明 */
-        #instructions {
-            position: absolute; bottom: 20px; left: 20px; z-index: 100;
-            color: rgba(255,255,255,0.7); display: none; pointer-events: none;
+        /* 蓄力条 */
+        #charge-bar {
+            position: absolute; top: 55%; left: 50%; transform: translateX(-50%);
+            width: 0px; height: 4px; background: #ff4500; 
+            box-shadow: 0 0 10px #ff4500; transition: width 0.1s;
         }
     </style>
 </head>
 <body>
 
-<div id="debug-hud">
-    <div>FPS: <span id="fps-val">0</span></div>
-    <div>Hands: <span id="hand-count">0</span></div>
-    <div>Status: <span id="status-text">Init...</span></div>
+<div id="hud">
+    <div id="spell-name" style="color: #444;">SYSTEM READY</div>
+    <div id="combo-counter">PROJECTILES: <span id="proj-count">0</span></div>
 </div>
+<div id="charge-bar"></div>
+<div id="crosshair"></div>
 
 <div id="ui-layer">
-    <h1 style="text-shadow: 0 0 10px #00ffff; margin-bottom: 20px;">VOID ARCANA <span style="font-size:0.5em">MAC/US</span></h1>
-    <button id="start-btn" onclick="startApp()">CLICK TO START</button>
-    <div id="loading-text" style="margin-top:10px; color:#aaa; display:none;">Loading AI Core...</div>
-</div>
-
-<div id="instructions">
-    <p>🖐️ <b>Open Hand</b>: Shield</p>
-    <p>🤘 <b>Rock Sign</b>: Lightning</p>
-    <p>✊ <b>Fist</b>: Gravity</p>
+    <h1 style="color:white; text-shadow: 0 0 30px #00ffff; margin-bottom: 40px; font-style:italic;">MAGIC V10</h1>
+    <button id="start-btn" onclick="startApp()">ENGAGE</button>
 </div>
 
 <video id="videoElement" playsinline muted autoplay></video>
 <div id="canvas-container"></div>
 
-<script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
-    import { FilesetResolver, HandLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/+esm';
+<script type="importmap">
+    { "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+        "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/+esm"
+    }}
+</script>
 
-    // --- 变量 ---
-    const debugHud = document.getElementById('debug-hud');
-    const handCountEl = document.getElementById('hand-count');
-    const fpsEl = document.getElementById('fps-val');
-    const statusEl = document.getElementById('status-text');
-    let handLandmarker = undefined;
+<script type="module">
+    import * as THREE from 'three';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+    import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
+
+    // --- 全局变量 ---
+    let camera, scene, renderer, composer;
+    let handLandmarker, video;
     let isRunning = false;
     let lastTime = 0;
     
-    // --- Three.js 初始化 ---
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x000000, 0.003);
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 20;
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.getElementById('canvas-container').appendChild(renderer.domElement);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5)); // 调亮一点
+    // --- 游戏状态管理 ---
+    const GameState = {
+        projectiles: [],
+        particles: [],
+        lightnings: [],
+        beam: null,
+        charging: { active: false, power: 0, mesh: null },
+        cooldown: 0
+    };
 
-    // --- 魔法对象 ---
-    const particles = [];
-    const lightnings = [];
-    let shieldMesh = null;
+    // --- 1. 图形引擎初始化 (Graphics) ---
+    function initThree() {
+        const container = document.getElementById('canvas-container');
+        scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x000000, 0.004); // 虚空迷雾
+
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        camera.position.z = 25;
+
+        renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // 性能优化
+        container.appendChild(renderer.domElement);
+
+        // 后处理 (Bloom 辉光)
+        const renderPass = new RenderPass(scene, camera);
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+        bloomPass.strength = 2.0; 
+        bloomPass.radius = 0.5;
+        bloomPass.threshold = 0.1;
+
+        composer = new EffectComposer(renderer);
+        composer.addPass(renderPass);
+        composer.addPass(bloomPass);
+
+        initAssets();
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth/window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+    }
+
+    // --- 2. 资源初始化 (Assets) ---
+    function initAssets() {
+        // 蓄力球
+        const chargeGeo = new THREE.SphereGeometry(1, 32, 32);
+        const chargeMat = new THREE.MeshBasicMaterial({ color: 0xff4500, transparent: true, opacity: 0.8 });
+        GameState.charging.mesh = new THREE.Mesh(chargeGeo, chargeMat);
+        GameState.charging.mesh.visible = false;
+        scene.add(GameState.charging.mesh);
+
+        // 激光束 (V8复用)
+        const beamGeo = new THREE.CylinderGeometry(0.3, 1.0, 50, 8);
+        beamGeo.rotateX(-Math.PI / 2);
+        beamGeo.translate(0, 0, -25); // Pivot fix
+        const beamMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending });
+        GameState.beam = new THREE.Mesh(beamGeo, beamMat);
+        GameState.beam.visible = false;
+        scene.add(GameState.beam);
+    }
+
+    // --- 3. 粒子与特效系统 (VFX System) ---
     
-    // 护盾材质
-    const shieldMat = new THREE.MeshPhongMaterial({ 
-        color: 0x00ffff, emissive: 0x0044aa, transparent: true, opacity: 0.3, wireframe: true 
-    });
+    // 生成光晕贴图
+    function getGlowTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 32; canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+        const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+        grad.addColorStop(0, 'white');
+        grad.addColorStop(0.4, 'rgba(255,255,255,0.3)');
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0,0,32,32);
+        return new THREE.CanvasTexture(canvas);
+    }
+    const particleTex = getGlowTexture();
 
-    // 坐标转换
-    function screenToWorld(x, y, z=10) {
+    // 发射投射物
+    function shootProjectile(pos, type) {
+        let color, size, speed, life;
+        
+        if (type === 'missile') { // 🖐 张手速射
+            color = 0x00ffff; // 青色
+            size = 0.6;
+            speed = 2.5;
+            life = 60;
+        } else if (type === 'nuke') { // 👌 蓄力核弹
+            color = 0xff4500; // 橙红色
+            size = 3.0 + (GameState.charging.power / 10);
+            speed = 1.2;
+            life = 100;
+        }
+
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ 
+            map: particleTex, color: color, blending: THREE.AdditiveBlending 
+        }));
+        sprite.position.copy(pos);
+        sprite.scale.set(size, size, 1);
+
+        // 目标：屏幕正中心深处，稍微带一点随机散射
+        const target = new THREE.Vector3(
+            (Math.random()-0.5)*5, 
+            (Math.random()-0.5)*5, 
+            -100
+        );
+        const velocity = new THREE.Vector3().subVectors(target, pos).normalize().multiplyScalar(speed);
+
+        scene.add(sprite);
+        GameState.projectiles.push({ mesh: sprite, vel: velocity, type: type, life: life });
+        
+        // 视觉反馈
+        document.getElementById('crosshair').classList.add('shooting');
+        setTimeout(() => document.getElementById('crosshair').classList.remove('shooting'), 50);
+    }
+
+    // 闪电链
+    function castLightning(start) {
+        const points = [];
+        let curr = start.clone();
+        const end = new THREE.Vector3((Math.random()-0.5)*20, (Math.random()-0.5)*20, -30);
+        
+        for(let i=0; i<8; i++) {
+            points.push(curr.clone());
+            curr.lerp(end, 0.2).add(new THREE.Vector3((Math.random()-0.5)*4, (Math.random()-0.5)*4, 0));
+        }
+        const line = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints(points), 
+            new THREE.LineBasicMaterial({ color: 0xaa00ff, linewidth: 2 })
+        );
+        scene.add(line);
+        GameState.lightnings.push({ mesh: line, life: 3 });
+    }
+
+    // 黑洞吸附
+    function applyBlackHole(center) {
+        // 吸附所有的投射物和粒子
+        const gravity = 0.8;
+        GameState.projectiles.forEach(p => {
+            const dir = new THREE.Vector3().subVectors(center, p.mesh.position).normalize();
+            p.vel.add(dir.multiplyScalar(gravity)); // 修改速度向量
+            p.mesh.scale.multiplyScalar(0.95); // 压缩
+        });
+        
+        // 生成紫色吸入粒子
+        if(Math.random()>0.5) {
+            const p = new THREE.Sprite(new THREE.SpriteMaterial({map:particleTex, color:0x8a2be2, blending:THREE.AdditiveBlending}));
+            p.position.copy(center).add(new THREE.Vector3((Math.random()-0.5)*10, (Math.random()-0.5)*10, (Math.random()-0.5)*10));
+            p.scale.set(0.5,0.5,1);
+            scene.add(p);
+            GameState.particles.push({mesh:p, vel:new THREE.Vector3().subVectors(center, p.position).multiplyScalar(0.1), life:20});
+        }
+    }
+
+    // --- 4. 逻辑主循环 (Main Logic) ---
+    function updateLogic(landmarks) {
+        const lm = landmarks;
+        // 坐标转换
+        const palm = screenToWorld(lm[9].x, lm[9].y, 0);
+        const idxTip = screenToWorld(lm[8].x, lm[8].y, 0);
+
+        // 手指状态
+        const idxUp = lm[8].y < lm[6].y;
+        const midUp = lm[12].y < lm[10].y;
+        const ringUp = lm[16].y < lm[14].y;
+        const pinkyUp = lm[20].y < lm[18].y;
+        
+        // 捏合检测
+        const pinchDist = Math.hypot(lm[8].x - lm[4].x, lm[8].y - lm[4].y);
+        const isPinching = pinchDist < 0.05;
+
+        // UI 文本更新
+        const hudName = document.getElementById('spell-name');
+        
+        // --- 状态机 ---
+        
+        // 1. 👌 蓄力 (优先级最高)
+        if (isPinching) {
+            GameState.charging.active = true;
+            GameState.charging.power = Math.min(GameState.charging.power + 1, 100);
+            
+            // 更新蓄力球
+            GameState.charging.mesh.visible = true;
+            GameState.charging.mesh.position.copy(idxTip);
+            const scale = 0.5 + (GameState.charging.power / 30);
+            GameState.charging.mesh.scale.set(scale, scale, scale);
+            // 颜色渐变 黄->红
+            GameState.charging.mesh.material.color.setHSL(0.1 - (GameState.charging.power/1000), 1, 0.5);
+
+            hudName.innerText = "CHARGING...";
+            hudName.style.color = "#ffaa00";
+            document.getElementById('charge-bar').style.width = GameState.charging.power + 'px';
+            return; // 蓄力时不做其他事
+        } 
+        
+        // 2. 蓄力释放判定 (从 Pinch 变为 Open)
+        if (GameState.charging.active && !isPinching) {
+            // 发射核弹
+            if (GameState.charging.power > 10) {
+                shootProjectile(idxTip, 'nuke');
+            }
+            // 重置
+            GameState.charging.active = false;
+            GameState.charging.power = 0;
+            GameState.charging.mesh.visible = false;
+            document.getElementById('charge-bar').style.width = '0px';
+            GameState.cooldown = 10; // 发射后冷却一下
+        }
+
+        // 冷却处理
+        if (GameState.cooldown > 0) {
+            GameState.cooldown--;
+            return;
+        }
+
+        // 3. 🖐 张手 = 自动速射 (Auto Fire)
+        // 条件：所有手指伸直，且没有在捏合
+        if (idxUp && midUp && ringUp && pinkyUp) {
+            hudName.innerText = "AUTO BARRAGE";
+            hudName.style.color = "#00ffff";
+            
+            // 射速控制: 每5帧发一发
+            if (performance.now() % 100 < 20) {
+                shootProjectile(palm, 'missile');
+            }
+        }
+        
+        // 4. 🤘 摇滚手 = 闪电 (Lightning)
+        else if (idxUp && pinkyUp && !midUp && !ringUp) {
+            hudName.innerText = "THUNDER";
+            hudName.style.color = "#aa00ff";
+            if(Math.random() > 0.5) castLightning(idxTip);
+            if(Math.random() > 0.5) castLightning(screenToWorld(lm[20].x, lm[20].y, 0));
+        }
+
+        // 5. ✌️ 剪刀手 = 激光 (Beam)
+        else if (idxUp && midUp && !ringUp && !pinkyUp) {
+            hudName.innerText = "VOID BEAM";
+            hudName.style.color = "#ff00ff";
+            
+            GameState.beam.visible = true;
+            // 激光位置在两指中间
+            const mid = screenToWorld(lm[12].x, lm[12].y, 0);
+            GameState.beam.position.copy(idxTip).add(mid).multiplyScalar(0.5);
+            
+            // 产生粒子
+            if(Math.random()>0.5) {
+                const p = new THREE.Sprite(new THREE.SpriteMaterial({map:particleTex, color:0xff00ff}));
+                p.position.copy(GameState.beam.position);
+                p.scale.set(0.5,0.5,1);
+                scene.add(p);
+                GameState.particles.push({mesh:p, vel:new THREE.Vector3((Math.random()-.5),(Math.random()-.5),2), life:10});
+            }
+        } else {
+            GameState.beam.visible = false;
+        }
+
+        // 6. ✊ 握拳 = 黑洞 (Gravity)
+        if (!idxUp && !midUp && !ringUp && !pinkyUp) {
+            hudName.innerText = "BLACK HOLE";
+            hudName.style.color = "#444444";
+            applyBlackHole(palm);
+        } else if (!isPinching) {
+            // 没握拳就没字
+            if(!idxUp) hudName.innerText = "READY";
+        }
+    }
+
+    function animate() {
+        if (!isRunning) return;
+        requestAnimationFrame(animate);
+
+        // 物理更新
+        // Projectiles
+        for (let i = GameState.projectiles.length - 1; i >= 0; i--) {
+            const p = GameState.projectiles[i];
+            p.mesh.position.add(p.vel);
+            p.life--;
+            if (p.life <= 0 || p.mesh.position.z < -150) {
+                scene.remove(p.mesh);
+                GameState.projectiles.splice(i, 1);
+            }
+        }
+        document.getElementById('proj-count').innerText = GameState.projectiles.length;
+
+        // Lightnings
+        for (let i = GameState.lightnings.length - 1; i >= 0; i--) {
+            GameState.lightnings[i].life--;
+            if (GameState.lightnings[i].life <= 0) {
+                scene.remove(GameState.lightnings[i].mesh);
+                GameState.lightnings.splice(i, 1);
+            }
+        }
+
+        // Particles
+        for (let i = GameState.particles.length - 1; i >= 0; i--) {
+            const p = GameState.particles[i];
+            p.mesh.position.add(p.vel);
+            p.life--;
+            p.mesh.material.opacity = p.life / 20;
+            if (p.life <= 0) {
+                scene.remove(p.mesh);
+                GameState.particles.splice(i, 1);
+            }
+        }
+
+        // AI 更新
+        const now = performance.now();
+        if (handLandmarker && video.currentTime > 0) {
+            const results = handLandmarker.detectForVideo(video, now);
+            if (results.landmarks && results.landmarks.length > 0) {
+                updateLogic(results.landmarks[0]);
+            } else {
+                GameState.beam.visible = false;
+                GameState.charging.mesh.visible = false;
+            }
+        }
+
+        composer.render();
+    }
+
+    // 工具函数
+    function screenToWorld(x, y, z) {
         const vec = new THREE.Vector3(((1-x)*2)-1, -(y*2)+1, 0.5);
         vec.unproject(camera);
         vec.sub(camera.position).normalize();
         return camera.position.clone().add(vec.multiplyScalar(-camera.position.z/vec.z + z));
     }
 
-    // --- 启动逻辑 (用户点击触发) ---
+    // 启动
     window.startApp = async function() {
         const btn = document.getElementById('start-btn');
-        const loadTxt = document.getElementById('loading-text');
+        btn.innerText = "LOADING...";
         
-        btn.style.display = 'none'; // 隐藏按钮
-        loadTxt.style.display = 'block'; // 显示加载中
+        initThree();
         
-        try {
-            // 1. 加载视觉库
-            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm");
-            
-            // 2. 加载模型 (Google 源)
-            handLandmarker = await HandLandmarker.createFromOptions(vision, {
-                baseOptions: {
-                    modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-                    delegate: "GPU"
-                },
-                runningMode: "VIDEO",
-                numHands: 2
-            });
-
-            // 3. 开启摄像头 (必须在这里开启)
-            const video = document.getElementById('videoElement');
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
-            video.srcObject = stream;
-            
-            // 等待视频数据加载
-            video.onloadeddata = () => {
-                video.play(); // 强制播放
-                document.getElementById('ui-layer').style.display = 'none'; // 隐藏所有UI
-                debugHud.style.display = 'block'; // 显示调试
-                document.getElementById('instructions').style.display = 'block';
-                isRunning = true;
-                loop();
-            };
-
-        } catch (e) {
-            alert("启动失败: " + e.message);
-            console.error(e);
-            btn.style.display = 'block';
-            btn.innerText = "RETRY";
-        }
-    }
-
-    // --- 主循环 ---
-    function loop() {
-        if(!isRunning) return;
-        requestAnimationFrame(loop);
-
-        const video = document.getElementById('videoElement');
-        const now = performance.now();
-        fpsEl.innerText = Math.round(1000 / (now - lastTime));
-        lastTime = now;
-
-        // AI 识别
-        if (handLandmarker && video.currentTime > 0) {
-            const results = handLandmarker.detectForVideo(video, now);
-            
-            // 调试信息：显示检测到了几只手
-            const count = results.landmarks ? results.landmarks.length : 0;
-            handCountEl.innerText = count;
-            statusEl.innerText = count > 0 ? "Tracking" : "Scanning...";
-            statusEl.style.color = count > 0 ? "#0f0" : "#f00";
-
-            let shieldActive = false;
-            let handPos = null;
-
-            if (results.landmarks) {
-                for (const lm of results.landmarks) {
-                    const idxOpen = lm[8].y < lm[6].y; // 简化版判断
-                    const pinkyOpen = lm[20].y < lm[18].y;
-                    
-                    // 逻辑判定
-                    if (idxOpen && pinkyOpen) { // Rock / Spider-Man
-                        createLightning(lm[8].x, lm[8].y);
-                        createLightning(lm[20].x, lm[20].y);
-                    } else if (idxOpen) { // Pointing
-                         // 简单的粒子
-                         spawnParticle(lm[8].x, lm[8].y, 0xffaa00);
-                    } else { // Fist / Closed
-                        spawnParticle(lm[9].x, lm[9].y, 0x8a2be2); // Void
-                    }
-
-                    // 护盾逻辑 (如果是张开手)
-                    // 这里简化为：只要检测到手，就尝试激活护盾（为了演示效果）
-                    // 实际可加严谨的手指判断
-                    shieldActive = true;
-                    handPos = lm[9]; // 手掌中心
-                }
-            }
-
-            updateShield(shieldActive, handPos);
-        }
-
-        // 渲染特效
-        updateEffects();
-        renderer.render(scene, camera);
-    }
-
-    // --- 特效函数 ---
-    function updateShield(active, pos) {
-        if(!shieldMesh) {
-            shieldMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(3,1), shieldMat);
-            scene.add(shieldMesh);
-        }
-        shieldMesh.visible = active;
-        if(active && pos) {
-            const worldPos = screenToWorld(pos.x, pos.y, -5);
-            shieldMesh.position.lerp(worldPos, 0.2);
-            shieldMesh.rotation.z += 0.05;
-        }
-    }
-
-    function createLightning(x, y) {
-        if(Math.random() > 0.4) return;
-        const start = screenToWorld(x, y, -2);
-        const end = start.clone().add(new THREE.Vector3((Math.random()-.5)*10, (Math.random()-.5)*10, -20));
+        const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm");
+        handLandmarker = await HandLandmarker.createFromOptions(vision, {
+            baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task", delegate: "GPU" },
+            runningMode: "VIDEO", numHands: 1
+        });
         
-        const pts = []; let curr = start.clone();
-        for(let i=0; i<6; i++) {
-            pts.push(curr.clone());
-            curr.lerp(end, 0.2).add(new THREE.Vector3((Math.random()-.5)*2, (Math.random()-.5)*2, 0));
-        }
-        const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({color: 0xaa00ff}));
-        scene.add(line);
-        lightnings.push({m:line, life:5});
+        video = document.getElementById('videoElement');
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+        video.srcObject = stream;
+        video.onloadeddata = () => {
+            document.getElementById('ui-layer').style.display = 'none';
+            document.getElementById('hud').style.display = 'block';
+            isRunning = true;
+            animate();
+        };
     }
-
-    function spawnParticle(x, y, color) {
-        const m = new THREE.Mesh(new THREE.PlaneGeometry(0.3,0.3), new THREE.MeshBasicMaterial({color:color}));
-        m.position.copy(screenToWorld(x,y,0));
-        m.lookAt(camera.position);
-        scene.add(m);
-        particles.push({m:m, life:30, v:new THREE.Vector3((Math.random()-.5)*0.2,(Math.random()-.5)*0.2,0)});
-    }
-
-    function updateEffects() {
-        for(let i=lightnings.length-1; i>=0; i--){
-            lightnings[i].life--; 
-            if(lightnings[i].life<=0){scene.remove(lightnings[i].m); lightnings.splice(i,1);}
-        }
-        for(let i=particles.length-1; i>=0; i--){
-            particles[i].life--; particles[i].m.position.add(particles[i].v); particles[i].m.material.opacity = particles[i].life/30;
-            if(particles[i].life<=0){scene.remove(particles[i].m); particles.splice(i,1);}
-        }
-    }
-    
-    // 自适应窗口
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth/window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
 </script>
 </body>
 </html>
