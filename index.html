@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Magic Master V11: Impact</title>
+    <title>Magic Master V12: Overload</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', sans-serif; }
         
@@ -24,11 +24,11 @@
         #start-btn {
             pointer-events: auto; padding: 20px 80px; font-size: 32px; font-weight: 900; letter-spacing: 5px;
             color: #fff; background: rgba(0,0,0,0.8); 
-            border: 4px solid #ff0055; border-radius: 2px; cursor: pointer;
-            box-shadow: 0 0 30px #ff0055; text-shadow: 0 0 20px #ff0055; 
+            border: 4px solid #00ff88; border-radius: 2px; cursor: pointer;
+            box-shadow: 0 0 30px #00ff88; text-shadow: 0 0 20px #00ff88; 
             transform: skewX(-10deg); transition: 0.1s;
         }
-        #start-btn:hover { background: #ff0055; color: #000; box-shadow: 0 0 80px #ff0055; transform: skewX(-10deg) scale(1.05); }
+        #start-btn:hover { background: #00ff88; color: #000; box-shadow: 0 0 80px #00ff88; transform: skewX(-10deg) scale(1.05); }
 
         /* HUD */
         #hud { 
@@ -41,7 +41,7 @@
         }
         #score { font-size: 24px; color: #888; margin-top: 5px; font-family: monospace; }
         
-        /* 蓄力条 (更暴力) */
+        /* 蓄力条 */
         #charge-bar-container {
             position: absolute; top: 60%; left: 50%; transform: translateX(-50%);
             width: 200px; height: 10px; background: rgba(0,0,0,0.5); border: 1px solid #444; display: none;
@@ -51,7 +51,7 @@
             box-shadow: 0 0 20px #ff4500; transition: width 0.05s;
         }
 
-        /* 准星 (动态反馈) */
+        /* 准星 */
         #crosshair {
             position: absolute; top: 50%; left: 50%; width: 40px; height: 40px;
             transform: translate(-50%, -50%); 
@@ -71,8 +71,8 @@
 <div id="crosshair"></div>
 
 <div id="ui-layer">
-    <h1 style="color:white; text-shadow: 0 0 40px #ff0055; margin-bottom: 50px; font-style:italic; font-size: 60px;">MAGIC V11</h1>
-    <button id="start-btn" onclick="startApp()">DOMINATE</button>
+    <h1 style="color:white; text-shadow: 0 0 40px #00ff88; margin-bottom: 50px; font-style:italic; font-size: 60px;">MAGIC V12</h1>
+    <button id="start-btn" onclick="startApp()">OVERLOAD</button>
 </div>
 
 <video id="videoElement" playsinline muted autoplay></video>
@@ -102,16 +102,16 @@
     const GameState = {
         projectiles: [],
         particles: [],
-        targets: [], // 靶子
+        targets: [],
         lightnings: [],
         beam: null,
         charging: { active: false, power: 0, mesh: null },
         score: 0,
-        shake: 0, // 屏幕震动强度
+        shake: 0, 
         cameraBasePos: new THREE.Vector3(0, 0, 25)
     };
 
-    // --- 1. 图形引擎 (Visuals Overdrive) ---
+    // --- 1. 图形引擎 ---
     function initThree() {
         const container = document.getElementById('canvas-container');
         scene = new THREE.Scene();
@@ -120,17 +120,17 @@
         camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
         camera.position.copy(GameState.cameraBasePos);
 
-        renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false }); // Post-proc handles AA
+        renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
         container.appendChild(renderer.domElement);
 
-        // --- OVERDRIVE BLOOM (过饱和光效) ---
+        // BLOOM 增强
         const renderPass = new RenderPass(scene, camera);
         const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-        bloomPass.strength = 3.5; // 强度翻倍 (原1.5)
-        bloomPass.radius = 0.6;
-        bloomPass.threshold = 0.05; // 即使是暗光也发光
+        bloomPass.strength = 3.0; 
+        bloomPass.radius = 0.5;
+        bloomPass.threshold = 0.05; 
 
         composer = new EffectComposer(renderer);
         composer.addPass(renderPass);
@@ -146,21 +146,15 @@
         });
     }
 
-    // --- 2. 资源与靶子 (Assets & Targets) ---
+    // --- 2. 资源 ---
     function initAssets() {
-        // 蓄力球 (多层结构，看起来更亮)
         const chargeGeo = new THREE.SphereGeometry(1, 32, 32);
         const chargeMat = new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0.9 });
         GameState.charging.mesh = new THREE.Mesh(chargeGeo, chargeMat);
-        // 添加核心白光
-        const coreGeo = new THREE.SphereGeometry(0.6, 16, 16);
-        const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-        GameState.charging.mesh.add(new THREE.Mesh(coreGeo, coreMat));
-        
+        GameState.charging.mesh.add(new THREE.Mesh(new THREE.SphereGeometry(0.6), new THREE.MeshBasicMaterial({ color: 0xffffff })));
         GameState.charging.mesh.visible = false;
         scene.add(GameState.charging.mesh);
 
-        // 激光
         const beamGeo = new THREE.CylinderGeometry(0.5, 2.0, 60, 8);
         beamGeo.rotateX(-Math.PI / 2);
         beamGeo.translate(0, 0, -30);
@@ -171,34 +165,17 @@
     }
 
     function spawnTarget() {
-        if(GameState.targets.length > 5) return; // 限制数量
-
-        // 生成漂浮的能量立方体
+        if(GameState.targets.length > 5) return;
         const geo = new THREE.IcosahedronGeometry(Math.random()*1.5 + 1.5, 0);
-        const mat = new THREE.MeshBasicMaterial({ 
-            color: new THREE.Color().setHSL(Math.random(), 1, 0.5), 
-            wireframe: true, transparent:true, opacity: 0.5 
-        });
+        const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color().setHSL(Math.random(), 1, 0.5), wireframe: true, transparent:true, opacity: 0.5 });
         const mesh = new THREE.Mesh(geo, mat);
-        
-        // 随机位置 (屏幕前方)
-        mesh.position.set(
-            (Math.random()-0.5) * 30,
-            (Math.random()-0.5) * 15,
-            -20 - Math.random() * 30
-        );
-        
-        // 内部发光体
-        const inner = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5, 0), new THREE.MeshBasicMaterial({color:0xffffff}));
-        mesh.add(inner);
-
+        mesh.position.set((Math.random()-0.5) * 30, (Math.random()-0.5) * 15, -20 - Math.random() * 30);
+        mesh.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.5), new THREE.MeshBasicMaterial({color:0xffffff})));
         scene.add(mesh);
         GameState.targets.push({ mesh: mesh, rotSpeed: (Math.random()-0.5)*0.1 });
     }
 
-    // --- 3. 增强型特效 (Impact FX) ---
-    
-    // 生成光晕贴图
+    // --- 3. 特效系统 ---
     function getGlowTexture() {
         const canvas = document.createElement('canvas');
         canvas.width = 32; canvas.height = 32;
@@ -213,44 +190,29 @@
     }
     const particleTex = getGlowTexture();
 
-    // 屏幕震动
-    function triggerShake(intensity) {
-        GameState.shake = intensity;
-    }
+    function triggerShake(intensity) { GameState.shake = intensity; }
 
-    // 爆炸 (大量粒子喷射)
     function createExplosion(pos, color, scale=1.0) {
-        const count = 30 * scale; // 粒子数量增加
+        const count = 30 * scale;
         for(let i=0; i<count; i++) {
             const size = (Math.random()*0.5 + 0.2) * scale;
-            const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ 
-                map: particleTex, color: color, blending: THREE.AdditiveBlending 
-            }));
+            const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: particleTex, color: color, blending: THREE.AdditiveBlending }));
             sprite.position.copy(pos);
             sprite.scale.set(size, size, 1);
-            
-            // 爆发速度
-            const speed = (Math.random() * 0.5 + 0.2) * scale;
-            const vel = new THREE.Vector3((Math.random()-0.5), (Math.random()-0.5), (Math.random()-0.5)).normalize().multiplyScalar(speed);
-            
+            const vel = new THREE.Vector3((Math.random()-0.5), (Math.random()-0.5), (Math.random()-0.5)).normalize().multiplyScalar((Math.random()*0.5+0.2)*scale);
             scene.add(sprite);
             GameState.particles.push({ mesh: sprite, vel: vel, life: 40 + Math.random()*20, drag: 0.95 });
         }
-        
-        // 震动屏幕
         triggerShake(0.5 * scale);
-        
-        // 准星反馈
         const ch = document.getElementById('crosshair');
-        ch.classList.add('hit');
-        setTimeout(()=>ch.classList.remove('hit'), 100);
+        ch.classList.add('hit'); setTimeout(()=>ch.classList.remove('hit'), 100);
     }
 
     function shootProjectile(pos, type) {
         let color, size, speed, life, scale=1;
         
         if (type === 'missile') { 
-            color = 0x00ffff; size = 1.0; speed = 3.0; life = 80;
+            color = 0x00ffff; size = 0.8; speed = 2.5; life = 80;
         } else if (type === 'nuke') { 
             color = 0xff3300; size = 4.0 + (GameState.charging.power/8); speed = 1.5; life = 120; scale=3;
         }
@@ -259,39 +221,33 @@
         sprite.position.copy(pos);
         sprite.scale.set(size, size, 1);
 
-        const target = new THREE.Vector3((Math.random()-0.5)*2, (Math.random()-0.5)*2, -100);
+        const target = new THREE.Vector3((Math.random()-0.5)*3, (Math.random()-0.5)*3, -100);
         const velocity = new THREE.Vector3().subVectors(target, pos).normalize().multiplyScalar(speed);
 
         scene.add(sprite);
         GameState.projectiles.push({ mesh: sprite, vel: velocity, type: type, life: life, scale: scale });
     }
 
-    // 闪电链 (更粗更亮)
     function castLightning(start) {
-        const points = [];
-        let curr = start.clone();
-        // 寻找最近的靶子作为目标，如果没有就随机
+        const points = []; let curr = start.clone();
         let target = new THREE.Vector3((Math.random()-0.5)*20, (Math.random()-0.5)*20, -30);
         if(GameState.targets.length > 0) {
             target = GameState.targets[0].mesh.position.clone();
-            createExplosion(target, 0xaa00ff, 0.5); // 击中反馈
-            scene.remove(GameState.targets[0].mesh);
-            GameState.targets.shift();
+            createExplosion(target, 0xaa00ff, 0.5); 
+            scene.remove(GameState.targets[0].mesh); GameState.targets.shift();
             GameState.score++;
-            document.getElementById('score-val').innerText = GameState.score;
         }
-
         for(let i=0; i<8; i++) {
             points.push(curr.clone());
             curr.lerp(target, 0.2).add(new THREE.Vector3((Math.random()-0.5)*3, (Math.random()-0.5)*3, 0));
         }
         const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({ color: 0xaa00ff, linewidth: 3 }));
         scene.add(line);
-        GameState.lightnings.push({ mesh: line, life: 4 });
+        GameState.lightnings.push({ mesh: line, life: 6 }); // 生命设为 6 帧
         triggerShake(0.2);
     }
 
-    // --- 4. 逻辑主循环 ---
+    // --- 4. 逻辑 ---
     function updateLogic(landmarks) {
         const lm = landmarks;
         const palm = screenToWorld(lm[9].x, lm[9].y, 0);
@@ -300,65 +256,62 @@
         const midUp = lm[12].y < lm[10].y;
         const ringUp = lm[16].y < lm[14].y;
         const pinkyUp = lm[20].y < lm[18].y;
-        const pinchDist = Math.hypot(lm[8].x - lm[4].x, lm[8].y - lm[4].y);
-        const isPinching = pinchDist < 0.05;
+        const isPinching = Math.hypot(lm[8].x - lm[4].x, lm[8].y - lm[4].y) < 0.05;
 
         const hudName = document.getElementById('spell-name');
-        const chargeCont = document.getElementById('charge-bar-container');
         
-        // 1. 蓄力核弹 (NUKE)
+        // 1. NUKE
         if (isPinching) {
             GameState.charging.active = true;
-            GameState.charging.power = Math.min(GameState.charging.power + 2, 100); // 蓄力更快
-            
+            GameState.charging.power = Math.min(GameState.charging.power + 2, 100);
             GameState.charging.mesh.visible = true;
             GameState.charging.mesh.position.copy(idxTip);
             const scale = 0.5 + (GameState.charging.power / 20);
             GameState.charging.mesh.scale.set(scale, scale, scale);
-            // 剧烈抖动蓄力球
             GameState.charging.mesh.position.add(new THREE.Vector3((Math.random()-0.5)*0.2, (Math.random()-0.5)*0.2, 0));
-            
             hudName.innerText = "CHARGING NUKE"; hudName.style.color = "#ff3300";
-            chargeCont.style.display = 'block';
+            document.getElementById('charge-bar-container').style.display = 'block';
             document.getElementById('charge-bar').style.width = GameState.charging.power + '%';
-            triggerShake(GameState.charging.power / 500); // 蓄力时屏幕微震
+            triggerShake(GameState.charging.power / 500);
             return;
         } 
         
         if (GameState.charging.active && !isPinching) {
             if (GameState.charging.power > 15) shootProjectile(idxTip, 'nuke');
             GameState.charging.active = false; GameState.charging.power = 0; GameState.charging.mesh.visible = false;
-            chargeCont.style.display = 'none';
+            document.getElementById('charge-bar-container').style.display = 'none';
         }
 
-        // 2. 速射 (AUTO FIRE)
+        // 2. AUTO BARRAGE (粒子翻倍版)
         if (idxUp && midUp && ringUp && pinkyUp) {
-            hudName.innerText = "RAPID FIRE"; hudName.style.color = "#00ffff";
-            if (performance.now() % 100 < 30) shootProjectile(palm, 'missile');
+            hudName.innerText = "RAPID FIRE"; hudName.style.color = "#00ff88";
+            // 提高发射频率
+            if (performance.now() % 100 < 50) { 
+                // !!! 关键修改：一次发射 3 发 !!!
+                for(let i=0; i<3; i++) {
+                    const offset = new THREE.Vector3((Math.random()-0.5)*2, (Math.random()-0.5)*2, 0);
+                    shootProjectile(palm.clone().add(offset), 'missile');
+                }
+            }
         }
         
-        // 3. 闪电 (THUNDER)
+        // 3. THUNDER
         else if (idxUp && pinkyUp && !midUp && !ringUp) {
             hudName.innerText = "THUNDER STORM"; hudName.style.color = "#aa00ff";
             if(Math.random() > 0.6) castLightning(idxTip);
         }
 
-        // 4. 激光 (BEAM)
+        // 4. BEAM
         else if (idxUp && midUp && !ringUp && !pinkyUp) {
             hudName.innerText = "DEATH BEAM"; hudName.style.color = "#ff00ff";
             GameState.beam.visible = true;
             const mid = screenToWorld(lm[12].x, lm[12].y, 0);
             GameState.beam.position.copy(idxTip).add(mid).multiplyScalar(0.5);
             
-            // 激光碰撞检测
             GameState.targets.forEach((t, i) => {
-                // 简单判断：激光位置和靶子X距离接近
                 if (Math.abs(t.mesh.position.x - GameState.beam.position.x) < 3) {
                     createExplosion(t.mesh.position, 0xff00ff, 0.8);
-                    scene.remove(t.mesh);
-                    GameState.targets.splice(i, 1);
-                    GameState.score++;
-                    triggerShake(0.3);
+                    scene.remove(t.mesh); GameState.targets.splice(i, 1); GameState.score++; triggerShake(0.3);
                 }
             });
         } else {
@@ -371,59 +324,56 @@
         if (!isRunning) return;
         requestAnimationFrame(animate);
 
-        // A. 摄像机震动处理
+        // Shake
         if (GameState.shake > 0) {
             camera.position.x = GameState.cameraBasePos.x + (Math.random()-0.5) * GameState.shake;
             camera.position.y = GameState.cameraBasePos.y + (Math.random()-0.5) * GameState.shake;
             camera.position.z = GameState.cameraBasePos.z + (Math.random()-0.5) * GameState.shake;
-            GameState.shake *= 0.9; // 衰减
+            GameState.shake *= 0.9; 
             if(GameState.shake < 0.01) GameState.shake = 0;
-        } else {
-            camera.position.copy(GameState.cameraBasePos);
-        }
+        } else { camera.position.copy(GameState.cameraBasePos); }
 
-        // B. 生成靶子
+        // Targets
         if(Math.random() > 0.98) spawnTarget();
         GameState.targets.forEach((t, i) => {
             t.mesh.rotation.x += t.rotSpeed; t.mesh.rotation.y += t.rotSpeed;
-            t.mesh.position.z += 0.05; // 慢慢飞近
-            if(t.mesh.position.z > 5) { scene.remove(t.mesh); GameState.targets.splice(i, 1); } // 飞过头了
+            t.mesh.position.z += 0.05; 
+            if(t.mesh.position.z > 5) { scene.remove(t.mesh); GameState.targets.splice(i, 1); }
         });
 
-        // C. 子弹与碰撞
+        // Projectiles
         for (let i = GameState.projectiles.length - 1; i >= 0; i--) {
             const p = GameState.projectiles[i];
             p.mesh.position.add(p.vel);
             p.life--;
-            
-            // 碰撞检测
             let hit = false;
             for(let j = GameState.targets.length - 1; j >= 0; j--) {
                 const t = GameState.targets[j];
                 if (p.mesh.position.distanceTo(t.mesh.position) < 3.0) {
                     createExplosion(t.mesh.position, p.mesh.material.color, p.scale);
-                    scene.remove(t.mesh);
-                    GameState.targets.splice(j, 1);
-                    GameState.score += (p.type==='nuke'?5:1);
-                    hit = true;
-                    break;
+                    scene.remove(t.mesh); GameState.targets.splice(j, 1); GameState.score += (p.type==='nuke'?5:1); hit = true; break;
                 }
             }
-
-            if (hit || p.life <= 0 || p.mesh.position.z < -150) {
-                scene.remove(p.mesh);
-                GameState.projectiles.splice(i, 1);
-            }
+            if (hit || p.life <= 0 || p.mesh.position.z < -150) { scene.remove(p.mesh); GameState.projectiles.splice(i, 1); }
         }
         document.getElementById('score-val').innerText = GameState.score;
 
-        // D. 粒子更新
+        // !!! 关键修复：闪电生命周期清理 !!!
+        for (let i = GameState.lightnings.length - 1; i >= 0; i--) {
+            const l = GameState.lightnings[i];
+            l.life--;
+            l.mesh.material.opacity = l.life / 6; // 渐隐
+            if (l.life <= 0) {
+                scene.remove(l.mesh);
+                GameState.lightnings.splice(i, 1);
+            }
+        }
+
+        // Particles
         for (let i = GameState.particles.length - 1; i >= 0; i--) {
             const p = GameState.particles[i];
-            p.mesh.position.add(p.vel);
-            p.vel.multiplyScalar(p.drag); // 阻力
-            p.life--;
-            p.mesh.scale.multiplyScalar(0.92);
+            p.mesh.position.add(p.vel); p.vel.multiplyScalar(p.drag);
+            p.life--; p.mesh.scale.multiplyScalar(0.92);
             if (p.life <= 0) { scene.remove(p.mesh); GameState.particles.splice(i, 1); }
         }
 
