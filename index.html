@@ -3,330 +3,280 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2025年度供应链财务深度分析报告</title>
+    <title>2025年度财务战略分析报告</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
         :root {
-            --primary: #2c3e50;
-            --secondary: #34495e;
-            --accent: #e74c3c;
-            --success: #27ae60;
-            --warning: #f39c12;
-            --bg: #f4f7f6;
+            --bg-color: #f0f2f5;
             --card-bg: #ffffff;
+            --primary: #1890ff;
+            --danger: #ff4d4f;
+            --warning: #faad14;
+            --success: #52c41a;
+            --text-main: #333;
+            --text-sub: #666;
         }
         
-        body {
-            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
-            background-color: var(--bg);
-            color: #333;
-            margin: 0;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 2px solid #ddd;
-        }
-
-        h1 { margin: 0; color: var(--primary); }
-        .subtitle { color: #7f8c8d; font-size: 1.1em; margin-top: 10px; }
-
-        /* KPI Cards */
-        .kpi-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .card {
-            background: var(--card-bg);
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            text-align: center;
-            transition: transform 0.2s;
-        }
-
-        .card:hover { transform: translateY(-5px); }
-
-        .card h3 { margin: 0 0 10px 0; font-size: 14px; color: #7f8c8d; text-transform: uppercase; }
-        .card .value { font-size: 24px; font-weight: bold; color: var(--primary); }
-        .card .sub { font-size: 12px; margin-top: 5px; }
-        .card.danger .value { color: var(--accent); }
-        .card.success .value { color: var(--success); }
-
-        /* Grid Layout for Charts */
-        .grid-section {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        @media (max-width: 768px) {
-            .grid-section { grid-template-columns: 1fr; }
-        }
-
-        .chart-box {
-            background: var(--card-bg);
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            height: 400px;
-        }
-
-        /* Analysis Section */
-        .analysis-box {
-            background: var(--card-bg);
-            border-radius: 10px;
-            padding: 30px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            margin-bottom: 30px;
-        }
-
-        .analysis-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-        }
-
-        h2 { border-left: 5px solid var(--primary); padding-left: 15px; color: var(--secondary); margin-top: 0; }
+        body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background: var(--bg-color); margin: 0; padding: 20px; color: var(--text-main); }
+        .container { max-width: 1300px; margin: 0 auto; }
         
-        .tag {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
+        /* 头部结论区 */
+        .header-section {
+            background: linear-gradient(135deg, #001529 0%, #003a8c 100%);
             color: white;
-            margin-right: 5px;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
-        .tag-danger { background-color: var(--accent); }
-        .tag-warn { background-color: var(--warning); }
-        .tag-good { background-color: var(--success); }
+        .header-section h1 { margin: 0; font-size: 28px; }
+        .header-section .subtitle { margin-top: 10px; font-size: 18px; opacity: 0.9; font-weight: 300; }
+        .header-badge { 
+            display: inline-block; background: var(--danger); color: white; 
+            padding: 5px 10px; border-radius: 4px; font-size: 14px; font-weight: bold; margin-bottom: 10px;
+        }
 
-        ul { padding-left: 20px; }
-        li { margin-bottom: 10px; line-height: 1.6; }
+        /* 核心指标卡 */
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px; }
+        .card { background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        .card-title { color: var(--text-sub); font-size: 14px; margin-bottom: 8px; }
+        .card-value { font-size: 26px; font-weight: bold; color: var(--text-main); }
+        .card-sub { font-size: 13px; margin-top: 8px; color: var(--text-sub); display: flex; align-items: center; }
+        .trend-up { color: var(--danger); margin-left: 5px; }
+        .trend-down { color: var(--success); margin-left: 5px; }
 
-        .highlight { font-weight: bold; color: var(--accent); }
+        /* 图表布局 */
+        .chart-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 25px; }
+        .chart-box { background: var(--card-bg); padding: 20px; border-radius: 8px; height: 420px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        
+        /* 表格区 */
+        .table-box { background: var(--card-bg); padding: 25px; border-radius: 8px; margin-bottom: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        .risk-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .risk-table th { text-align: left; padding: 12px; background: #fafafa; border-bottom: 2px solid #f0f0f0; color: var(--text-sub); font-size: 14px; }
+        .risk-table td { padding: 12px; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+        .risk-tag { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .bg-danger-light { background: #fff1f0; color: #cf1322; }
+        .bg-warn-light { background: #fffbe6; color: #d48806; }
+        .bg-grey-light { background: #f5f5f5; color: #8c8c8c; }
+
+        /* SWOT */
+        .swot-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .swot-card { padding: 20px; border-radius: 8px; background: white; border-top: 4px solid #ddd; }
+        .swot-s { border-color: var(--success); }
+        .swot-w { border-color: var(--danger); }
+        .swot-o { border-color: var(--primary); }
+        .swot-t { border-color: var(--warning); }
+        .swot-header { font-weight: bold; font-size: 16px; margin-bottom: 10px; display: flex; align-items: center; }
+        .swot-list { padding-left: 20px; margin: 0; font-size: 14px; line-height: 1.6; color: #444; }
+
+        .highlight-text { color: var(--danger); font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <header>
-        <h1>2025年度供应链与现金流分析看板</h1>
-        <div class="subtitle">数据来源：2025购入汇总表 vs 2025支付汇总表 | 汇报对象：总经理</div>
-    </header>
-
-    <div class="kpi-row">
-        <div class="card">
-            <h3>全年总购入</h3>
-            <div class="value">¥423.0 万</div>
-            <div class="sub">月均消耗 ¥35.2万</div>
-        </div>
-        <div class="card danger">
-            <h3>全年总支付</h3>
-            <div class="value">¥507.4 万</div>
-            <div class="sub" style="color: #e74c3c;">支付率 120% (现金流倒挂)</div>
-        </div>
-        <div class="card danger">
-            <h3>期末应付余额</h3>
-            <div class="value">¥329.0 万</div>
-            <div class="sub">相当于 9.4个月 的采购额</div>
-        </div>
-        <div class="card">
-            <h3>最大单笔僵尸债</h3>
-            <div class="value">¥114.7 万</div>
-            <div class="sub">供应商：万黄明 (已停止合作)</div>
+    <div class="header-section">
+        <div class="header-badge">战略结论</div>
+        <h1>2025年：现金流表面不差，但负债包袱很重</h1>
+        <div class="subtitle">
+            “边经营、边还旧账”模式运行中。全年付款 > 采购 (120%)，但年底仍背负 329万 债务。
+            <br>警报：超过 60% 的债务集中在两家供应商，且存在巨大的内控黑洞。
         </div>
     </div>
 
-    <div class="grid-section">
+    <div class="kpi-grid">
+        <div class="card">
+            <div class="card-title">剪刀差 (付款 - 采购)</div>
+            <div class="card-value" style="color: var(--primary);">+¥844,265</div>
+            <div class="card-sub">
+                现金流出 > 成本
+                <span>意味着在净偿还历史旧债</span>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-title">期末应付账款余额</div>
+            <div class="card-value" style="color: var(--danger);">¥3,290,678</div>
+            <div class="card-sub">
+                较期初下降 20.6%
+                <span class="trend-down">↓ (去库存化中)</span>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-title">Top 2 债务集中度</div>
+            <div class="card-value" style="color: var(--danger);">61.3%</div>
+            <div class="card-sub">
+                黄万明 + 稳泰德
+                <span>合计欠款 201万 (极高风险)</span>
+            </div>
+        </div>
+        <div class="card" style="border: 2px solid var(--warning);">
+            <div class="card-title">⚠️ 内控黑洞 (个人/财务汇款)</div>
+            <div class="card-value" style="color: var(--warning);">¥1,656,780</div>
+            <div class="card-sub">
+                占全年付款的 <b>32.6%</b>
+                <span>缺乏正规发票与账期</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="chart-grid">
         <div class="chart-box" id="flowChart"></div>
-        <div class="chart-box" id="debtComposition"></div>
+        <div class="chart-box" id="debtPieChart"></div>
     </div>
 
-    <div class="analysis-box">
-        <h2>📊 供应商风险矩阵 (Risk Matrix)</h2>
-        <div id="scatterChart" style="width: 100%; height: 400px;"></div>
-        <p style="font-size: 0.9em; color: #666; text-align: center; margin-top: 10px;">
-            <span class="tag tag-danger">红色区域</span> 僵尸债务/高风险：采购极少但欠款巨大。<br>
-            <span class="tag tag-warn">黄色区域</span> 内部/垫资风险：采购量大且欠款多，主要是内部人员（周陵峰等）。
-        </p>
+    <div class="table-box">
+        <h3 style="margin-top:0; color: var(--primary);">🚨 必须立即关注的 TOP 债务人清单 (老板决策版)</h3>
+        <p style="font-size:13px; color:#666;">筛选逻辑：余额巨大、已停止合作或付款比例极低</p>
+        <table class="risk-table">
+            <thead>
+                <tr>
+                    <th>供应商</th>
+                    <th>状态</th>
+                    <th>2025采购额</th>
+                    <th>2025付款额</th>
+                    <th>期末欠款余额</th>
+                    <th>付款覆盖率</th>
+                    <th>风险解读</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><b>黄万明 (冻货野味)</b></td>
+                    <td><span class="risk-tag bg-grey-light">僵尸/未合作</span></td>
+                    <td>0</td>
+                    <td>151,846</td>
+                    <td class="highlight-text">1,147,729</td>
+                    <td>-</td>
+                    <td><span class="risk-tag bg-danger-light">最大雷区</span> 无业务产出，纯粹失血。需谈判折价结清。</td>
+                </tr>
+                <tr>
+                    <td><b>稳泰德 (鱼)</b></td>
+                    <td><span class="risk-tag bg-danger-light">核心/高危</span></td>
+                    <td>680,713</td>
+                    <td>220,521</td>
+                    <td class="highlight-text">868,334</td>
+                    <td><b>15%</b></td>
+                    <td><span class="risk-tag bg-danger-light">随时断供</span> 采购巨大但付款极少，供应链关系极度紧绷。</td>
+                </tr>
+                <tr>
+                    <td><b>壹加壹 (干货)</b></td>
+                    <td><span class="risk-tag bg-grey-light">僵尸/未合作</span></td>
+                    <td>-594</td>
+                    <td>205,723</td>
+                    <td>233,966</td>
+                    <td>-</td>
+                    <td>历史结算项目，建议查清退货冲账情况。</td>
+                </tr>
+                <tr>
+                    <td><b>红旗粮油</b></td>
+                    <td><span class="risk-tag bg-warn-light">预警</span></td>
+                    <td>110,594</td>
+                    <td>31,744</td>
+                    <td>145,210</td>
+                    <td>48%</td>
+                    <td>刚需品类，覆盖率不足50%，有被提价或断供风险。</td>
+                </tr>
+                <tr>
+                    <td><b>周俊峰/潘达琳 (内部)</b></td>
+                    <td><span class="risk-tag bg-warn-light">内控黑洞</span></td>
+                    <td>~1,300,000</td>
+                    <td>1,656,780</td>
+                    <td>~1,100,000</td>
+                    <td>100%+</td>
+                    <td><b>严重合规风险</b>。个人垫资/汇款规模过大，无论审计还是税务都是大雷。</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
-    <div class="analysis-box">
-        <div class="analysis-row">
-            <div>
-                <h2>🚨 核心风险洞察 (Critical Risks)</h2>
-                <ul>
-                    <li><span class="tag tag-danger">现金失血</span> <b>支付剪刀差：</b>今年每采购1元物资，实际流出现金1.2元。公司正在用宝贵的现金流填补历史“天坑”。</li>
-                    <li><span class="tag tag-danger">僵尸债务</span> <b>万黄明/壹加壹问题：</b>仅“万黄明”一家未合作供应商，就占据了114万的债务余额。这笔钱无法带来任何新业务价值，是纯粹的负债包袱。</li>
-                    <li><span class="tag tag-warn">合规隐患</span> <b>内部采购比例过高：</b>“周陵峰(酒店自购/财务汇款)”全年采购超130万。过度依赖个人垫资/现金采购，导致公司无法获得正规供应商的60-90天账期支持。</li>
-                </ul>
-            </div>
-            <div>
-                <h2>💡 资深财务建议 (Action Plan)</h2>
-                <ul>
-                    <li><span class="tag tag-good">立即执行</span> <b>债务冻结与折价谈判：</b>针对“未合作”列表中的大额债主（如万黄明），停止常规月度付款。启动谈判：要么“停息挂账”，要么“一次性支付50%结清所有债务”。</li>
-                    <li><span class="tag tag-good">管理优化</span> <b>引入正规配送商：</b>必须降低“酒店自购/现金采购”的比例。引入1-2家大型综合配送商，利用全年400万的采购体量谈判“月结60天”账期，释放现金流。</li>
-                    <li><span class="tag tag-good">风控红线</span> <b>以收定支：</b>建立付款红线，每月付款总额不得超过上月营收的 85%。防止在淡季（如6-8月）因惯性付款导致现金流断裂。</li>
-                </ul>
-            </div>
+    <h3 style="margin-left: 5px; color: #333;">战略 SWOT 分析 (微缩版)</h3>
+    <div class="swot-grid">
+        <div class="swot-card swot-s">
+            <div class="swot-header"><span style="color:var(--success); margin-right:8px;">●</span> 优点 (Strengths)</div>
+            <ul class="swot-list">
+                <li><b>主动去杠杆：</b>付款/采购比为 1.2，公司确实在努力还债，信用修复意愿强。</li>
+                <li><b>生鲜基本盘：</b>部分主力生鲜供应商（如海鲜店）付款覆盖率达100%，保障了基本运营。</li>
+            </ul>
+        </div>
+        <div class="swot-card swot-w">
+            <div class="swot-header"><span style="color:var(--danger); margin-right:8px;">●</span> 缺点 (Weaknesses)</div>
+            <ul class="swot-list">
+                <li><b>内控缺失：</b>32.6% 的资金通过“个人/财务汇款”流出，议价能力弱，且存在舞弊空间。</li>
+                <li><b>资金错配：</b>旺季（10月）一边备货一边大额还旧账，导致单月现金流压力剧增。</li>
+            </ul>
+        </div>
+        <div class="swot-card swot-o">
+            <div class="swot-header"><span style="color:var(--primary); margin-right:8px;">●</span> 机会 (Opportunities)</div>
+            <ul class="swot-list">
+                <li><b>债务重组：</b>利用“黄万明”等僵尸债务急于回款的心理，谈“一次性结清打6折”，直接增厚利润。</li>
+                <li><b>集采替代：</b>引入正规配送商替代零散的“酒店自购”，获取60天正规账期。</li>
+            </ul>
+        </div>
+        <div class="swot-card swot-t">
+            <div class="swot-header"><span style="color:var(--warning); margin-right:8px;">●</span> 威胁 (Threats)</div>
+            <ul class="swot-list">
+                <li><b>断供危机：</b>“稳泰德”一旦断供，将直接冲击鱼类菜品出品（付款仅覆盖15%）。</li>
+                <li><b>税务/审计雷：</b>百万级的个人账户往来，随时可能引发税务稽查或审计无法通过。</li>
+            </ul>
         </div>
     </div>
 </div>
 
 <script>
-    // --- Data Preparation (Extracted from Images) ---
+    // --- Data Configuration ---
     const months = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
-    
-    // Purchase Totals
     const dataPurchase = [594695, 231819, 376427, 393486, 386655, 190646, 242635, 266793, 408667, 510825, 313450, 314449];
-    
-    // Payment Totals
     const dataPayment = [594648, 295501, 403718, 500030, 529229, 241386, 258579, 322181, 422620, 685488, 348230, 473203];
+    const gap = dataPayment.map((pay, i) => pay - dataPurchase[i]);
 
-    // --- Chart 1: Cash Flow Gap ---
+    // Chart 1: Cash Flow & Scissors Difference
     const flowChart = echarts.init(document.getElementById('flowChart'));
-    const flowOption = {
-        title: { text: '月度资金流向对比 (剪刀差分析)', left: 'center' },
+    flowChart.setOption({
+        title: { text: '宏观资金流向：采购 vs 支付 (剪刀差)', left: 'left' },
         tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-        legend: { top: 'bottom' },
+        legend: { data: ['采购额(成本)', '支付额(流出)', '净还款(剪刀差)'], top: 'bottom' },
         grid: { left: '3%', right: '4%', bottom: '10%', containLabel: true },
         xAxis: { type: 'category', data: months },
         yAxis: { type: 'value', name: '金额 (RMB)' },
         series: [
-            {
-                name: '当月采购 (成本)',
-                type: 'bar',
-                data: dataPurchase,
-                itemStyle: { color: '#3498db' }
-            },
-            {
-                name: '当月支付 (流出)',
-                type: 'bar',
-                data: dataPayment,
-                itemStyle: { color: '#e74c3c' } // Red to show cash leaving
-            },
-            {
-                name: '现金流缺口',
-                type: 'line',
-                data: dataPayment.map((val, i) => val - dataPurchase[i]),
-                itemStyle: { color: '#2c3e50' },
-                lineStyle: { type: 'dashed' }
+            { name: '采购额(成本)', type: 'bar', data: dataPurchase, itemStyle: { color: '#91c7ae' } },
+            { name: '支付额(流出)', type: 'bar', data: dataPayment, itemStyle: { color: '#ff4d4f' } },
+            { 
+                name: '净还款(剪刀差)', type: 'line', data: gap, 
+                itemStyle: { color: '#003a8c' }, lineStyle: { width: 3, type: 'dotted' },
+                markPoint: {
+                    data: [
+                        { type: 'max', name: '最大还款压力', label: {formatter: '10月峰值'} }
+                    ]
+                }
             }
         ]
-    };
-    flowChart.setOption(flowOption);
+    });
 
-    // --- Chart 2: Debt Structure ---
-    // Extracting key debt components
-    const totalDebt = 3290678;
-    const debtWan = 1147729; // 万黄明
-    const debtZhou = 783293 + 326388; // 周陵峰 + 潘述靖 (Internal/Finance)
-    const debtOthers = totalDebt - debtWan - debtZhou;
-
-    const debtChart = echarts.init(document.getElementById('debtComposition'));
-    const debtOption = {
-        title: { text: '期末债务构成分析', left: 'center' },
+    // Chart 2: Debt Concentration Pie
+    const debtChart = echarts.init(document.getElementById('debtPieChart'));
+    debtChart.setOption({
+        title: { text: '期末债务集中度 (致命点)', left: 'center', bottom: 0 },
         tooltip: { trigger: 'item' },
-        legend: { top: 'bottom' },
         series: [
             {
-                name: '债务来源',
+                name: '债务余额',
                 type: 'pie',
                 radius: ['40%', '70%'],
-                avoidLabelOverlap: false,
-                itemStyle: {
-                    borderRadius: 10,
-                    borderColor: '#fff',
-                    borderWidth: 2
-                },
-                label: { show: false, position: 'center' },
-                emphasis: {
-                    label: { show: true, fontSize: '16', fontWeight: 'bold' }
-                },
-                labelLine: { show: false },
+                itemStyle: { borderRadius: 5, borderColor: '#fff', borderWidth: 2 },
+                label: { show: true, formatter: '{b}\n{d}%' },
                 data: [
-                    { value: debtWan, name: '僵尸/停合债务 (万黄明等)', itemStyle: { color: '#c0392b' } },
-                    { value: debtZhou, name: '内部垫资欠款 (周/潘)', itemStyle: { color: '#f39c12' } },
-                    { value: debtOthers, name: '正常供应商欠款', itemStyle: { color: '#27ae60' } }
+                    { value: 1147729, name: '黄万明 (僵尸)', itemStyle: { color: '#cf1322' } },
+                    { value: 868334, name: '稳泰德 (高危)', itemStyle: { color: '#ff7875' } },
+                    { value: 1274615, name: '所有其他供应商', itemStyle: { color: '#d9d9d9' } }
                 ]
             }
         ]
-    };
-    debtChart.setOption(debtOption);
+    });
 
-    // --- Chart 3: Scatter Risk Matrix ---
-    // X: Yearly Purchase, Y: Outstanding Balance
-    // Format: [Purchase, Balance, Size, Name, Status]
-    const supplierData = [
-        [0, 1147729, 80, '万黄明 (冻货)', 'Zombie'], // Huge risk
-        [547099, 547099, 60, '周陵峰 (酒店自购)', 'Internal'],
-        [783293, 783293, 70, '周陵峰 (财务)', 'Internal'],
-        [652142, 64367, 50, '常德谈鲜生', 'Active'], // Good
-        [221087, 11221, 30, '陈氏鸡鸭', 'Active'],
-        [205723, 233966, 40, '壹加壹 (干货)', 'Zombie'], // Risk
-        [151846, 175322, 35, '昊林酒店用品', 'Active']
-    ];
-
-    const scatterChart = echarts.init(document.getElementById('scatterChart'));
-    const scatterOption = {
-        title: { text: '供应商风险象限：采购额 vs 欠款余额', left: 'center' },
-        grid: { left: '10%', right: '15%', top: '15%', bottom: '10%' },
-        tooltip: {
-            formatter: function (param) {
-                return `<b>${param.data[3]}</b><br/>全年采购: ${param.data[0].toLocaleString()}<br/>当前欠款: ${param.data[1].toLocaleString()}`;
-            }
-        },
-        xAxis: { name: '2025全年采购额', splitLine: { show: false } },
-        yAxis: { name: '年底欠款余额', splitLine: { show: true, lineStyle: { type: 'dashed' } } },
-        series: [{
-            type: 'scatter',
-            symbolSize: function (data) { return Math.sqrt(data[1]) / 15; }, // Size based on debt
-            data: supplierData,
-            itemStyle: {
-                color: function(param) {
-                    if (param.data[4] === 'Zombie') return '#c0392b';
-                    if (param.data[4] === 'Internal') return '#f39c12';
-                    return '#27ae60';
-                },
-                shadowBlur: 10,
-                shadowColor: 'rgba(0, 0, 0, 0.2)'
-            },
-            label: {
-                show: true,
-                formatter: function (param) { return param.data[3]; },
-                position: 'top'
-            },
-            markArea: {
-                silent: true,
-                itemStyle: { color: 'transparent', borderWidth: 1, borderType: 'dashed' },
-                data: [[
-                    { name: '高危僵尸区 (无采购/高欠款)', xAxis: -50000, yAxis: 200000 },
-                    { xAxis: 200000, yAxis: 1500000 }
-                ]]
-            }
-        }]
-    };
-    scatterChart.setOption(scatterOption);
-
-    // Responsive Resize
-    window.addEventListener('resize', function() {
+    window.addEventListener('resize', () => {
         flowChart.resize();
         debtChart.resize();
-        scatterChart.resize();
     });
 </script>
 
